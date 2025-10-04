@@ -1,4 +1,9 @@
-import { Provider, WebhookTrigger, Handler, WebhookEvent, WebhookContext } from "../common";
+import { WebhookTrigger, Handler, WebhookEvent, WebhookContext } from "../common";
+import { BaseProvider, BaseProviderConfig } from "./base";
+
+export type GoogleCalendarConfig = BaseProviderConfig & {
+    timezone?: string; // Default timezone for calendar operations
+};
 
 // Google Calendar event types
 export type GoogleCalendarEventCreateEvent = {
@@ -28,11 +33,36 @@ export type GoogleCalendarEventCreateTriggerArgs = {
     handler: Handler<WebhookEvent<GoogleCalendarEventCreateEvent>, WebhookContext>;
 }
 
-export class GoogleCalendar implements Provider {
-    private email: string;
+export class GoogleCalendar extends BaseProvider {
+    providerType = 'googleCalendar';
 
-    constructor(email: string) {
-        this.email = email;
+    secretDefinitions = [
+        {
+            key: 'email',
+            label: 'Google Calendar Email',
+            type: 'string' as const,
+            required: true,
+        },
+        {
+            key: 'clientId',
+            label: 'Google OAuth Client ID',
+            type: 'string' as const,
+            required: true,
+        },
+        {
+            key: 'clientSecret',
+            label: 'Google OAuth Client Secret',
+            type: 'password' as const,
+            required: true,
+        }
+    ];
+
+    constructor(config?: GoogleCalendarConfig | string) {
+        super(config);
+    }
+
+    private getTimezone(): string {
+        return this.getConfig<string>('timezone', 'UTC') || 'UTC';
     }
 
     triggers = {
@@ -44,7 +74,12 @@ export class GoogleCalendar implements Provider {
                 method: 'POST',
                 setup: async (ctx) => {
                     // TODO: Register webhook with Google Calendar API
+                    const email = this.getSecret('email');
+                    const clientId = this.getSecret('clientId');
+                    const timezone = this.getTimezone();
                     console.log('Register Google Calendar webhook at:', ctx.webhookUrl);
+                    console.log('For calendar:', email);
+                    console.log('Timezone:', timezone);
                 }
             }
         }

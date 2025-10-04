@@ -1,12 +1,18 @@
 import {
-    Provider,
     CronTrigger,
     CronTriggerArgs,
     WebhookTrigger,
     WebhookTriggerArgs
 } from "../common"
+import { BaseProvider } from "./base";
 
-export class Builtin implements Provider {
+export class Builtin extends BaseProvider {
+    providerType = 'builtin';
+
+    constructor() {
+        super(); // No credential name needed for builtin
+    }
+
     actions = {}
     triggers = {
         onCron: (args: CronTriggerArgs): CronTrigger => {

@@ -1,6 +1,8 @@
-import { Provider } from "../common"
+import { BaseProvider } from "./base";
 
-export class Slack implements Provider {
+export class Slack extends BaseProvider {
+    providerType = 'slack';
+
     actions = {}
     triggers = {}
 }

@@ -2,6 +2,7 @@
   "name": "@DeveloperFlows/floww-sdk",
   "version": "1.0.0",
   "description": "SDK for building trigger-based workflows",
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DeveloperFlows/floww-sdk.git"

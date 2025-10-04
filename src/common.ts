@@ -33,10 +33,13 @@ export interface WebhookTrigger<TBody = any> extends Trigger<WebhookEvent<TBody>
 
 export type WebhookSetupContext = {
   webhookUrl: string; // Full URL where webhook will be available
+  // Store metadata that can be used during teardown
+  setMetadata: (key: string, value: any) => void;
 }
 
 export type WebhookTeardownContext = {
-  // cleanup utilities
+  // Retrieve metadata stored during setup
+  getMetadata: (key: string) => any;
 }
 
 // Webhook trigger args
@@ -82,7 +85,18 @@ export type CronTriggerArgs = {
 
 export interface Action {}
 
+export type SecretDefinition = {
+  key: string;
+  label: string;
+  type: 'string' | 'password';
+  required: boolean;
+};
+
 export interface Provider {
+  providerType: string; // e.g., 'gitlab', 'googleCalendar'
+  credentialName?: string; // User-specified credential name
+  secretDefinitions?: SecretDefinition[];
+  configure?: (secrets: Record<string, string>) => void;
   triggers: Record<string, (...args: any[]) => Trigger>;
   actions: Record<string, (...args: any[]) => Action>;
 }
