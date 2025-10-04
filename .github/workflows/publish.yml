@@ -72,62 +72,26 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-      - name: Determine version strategy
-        id: version
+      - name: Generate version from branch and commit
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          echo "Branch: $BRANCH_NAME"
+          COMMIT_HASH=${GITHUB_SHA:0:8}
 
-          if [[ "$BRANCH_NAME" == "main" ]]; then
-            # Main branch: patch version
-            echo "strategy=patch" >> $GITHUB_OUTPUT
-            echo "tag_prefix=" >> $GITHUB_OUTPUT
-          elif [[ "$BRANCH_NAME" == "develop" ]]; then
-            # Develop branch: prerelease with alpha
-            echo "strategy=prerelease" >> $GITHUB_OUTPUT
-            echo "tag_prefix=alpha" >> $GITHUB_OUTPUT
-          elif [[ "$BRANCH_NAME" == feature/* ]] || [[ "$BRANCH_NAME" == feat/* ]]; then
-            # Feature branch: prerelease with beta
-            echo "strategy=prerelease" >> $GITHUB_OUTPUT
-            echo "tag_prefix=beta" >> $GITHUB_OUTPUT
-          else
-            # Other branches: prerelease with rc
-            echo "strategy=prerelease" >> $GITHUB_OUTPUT
-            echo "tag_prefix=rc" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Update version
-        run: |
-          if [[ "${{ steps.version.outputs.strategy }}" == "prerelease" ]]; then
-            npm version prerelease --preid=${{ steps.version.outputs.tag_prefix }} --no-git-tag-version
-          else
-            npm version ${{ steps.version.outputs.strategy }} --no-git-tag-version
-          fi
-
-          # Get the new version
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
-
-      - name: Create package variant for feature branches
-        if: steps.version.outputs.strategy == 'prerelease'
-        run: |
-          # For feature branches, create a scoped variant to avoid conflicts
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          # Sanitize branch name for npm version (replace special chars with dash)
           SAFE_BRANCH=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
 
-          # Update package name for feature branches to include branch info
-          if [[ "$BRANCH_NAME" != "develop" ]]; then
-            jq --arg branch "$SAFE_BRANCH" '.name = "@DeveloperFlows/floww-sdk-" + $branch' package.json > package.tmp.json
-            mv package.tmp.json package.json
-          fi
+          # Create version: branch-commithash
+          NEW_VERSION="${SAFE_BRANCH}-${COMMIT_HASH}"
+
+          # Update package.json version
+          jq --arg version "$NEW_VERSION" '.version = $version' package.json > package.tmp.json
+          mv package.tmp.json package.json
+
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "Generated version: $NEW_VERSION"
 
       - name: Publish to GitHub Package Registry
-        run: |
-          if [[ "${{ steps.version.outputs.strategy }}" == "prerelease" ]]; then
-            pnpm publish --tag ${{ steps.version.outputs.tag_prefix }} --access public --no-git-checks
-          else
-            pnpm publish --access public --no-git-checks
-          fi
+        run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
