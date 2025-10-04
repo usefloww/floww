@@ -21,7 +21,7 @@ export class FlowEngine {
 
   constructor(private port: number, private host: string) {
     // TODO: Remove this, Temporary override to use ngrok
-    this.host = "b260a36b09c2.ngrok-free.app";
+    // this.host = "b260a36b09c2.ngrok-free.app";
     this.server = new WebhookServer(port, host);
     this.scheduler = new CronScheduler();
     this.secretManager = new SecretManager();
