@@ -1,18 +1,31 @@
-import { Provider, Handler, Trigger } from "../common"
+import {
+    Provider,
+    CronTrigger,
+    CronTriggerArgs,
+    WebhookTrigger,
+    WebhookTriggerArgs
+} from "../common"
 
 export class Builtin implements Provider {
     actions = {}
     triggers = {
-        cron: (args: { data: { expression: string }, handler: Handler }): Trigger => {
+        onCron: (args: CronTriggerArgs): CronTrigger => {
             return {
-                infrastructure: [],
+                type: 'cron',
+                expression: args.expression,
                 handler: args.handler,
+                setup: args.setup,
+                teardown: args.teardown,
             }
         },
-        webhook: (args: { handler: Handler }): Trigger => {
+        onWebhook: <TBody = any>(args: WebhookTriggerArgs<TBody>): WebhookTrigger<TBody> => {
             return {
-                infrastructure: [],
+                type: 'webhook',
                 handler: args.handler,
+                path: args.path,
+                method: args.method || 'POST',
+                setup: args.setup,
+                teardown: args.teardown,
             }
         }
     }

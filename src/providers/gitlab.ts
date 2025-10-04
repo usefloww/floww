@@ -1,5 +1,33 @@
-import { Provider, Trigger, Handler } from "../common";
-import * as pulumi_gitlab from "@pulumi/gitlab";
+import { Provider, WebhookTrigger, Handler, WebhookEvent, WebhookContext } from "../common";
+
+// GitLab webhook event types
+export type GitLabMergeRequestCommentEvent = {
+    object_kind: 'note';
+    user: {
+        name: string;
+        username: string;
+        id: number;
+    };
+    project: {
+        id: number;
+        name: string;
+    };
+    merge_request: {
+        id: number;
+        iid: number;
+        title: string;
+    };
+    object_attributes: {
+        note: string;
+        created_at: string;
+    };
+}
+
+export type GitLabMergeRequestCommentTriggerArgs = {
+    projectId?: string;
+    groupId?: string;
+    handler: Handler<WebhookEvent<GitLabMergeRequestCommentEvent>, WebhookContext>;
+}
 
 export class Gitlab implements Provider {
     private accessToken: string;
@@ -10,34 +38,25 @@ export class Gitlab implements Provider {
 
     actions = {}
     triggers = {
-        onMergeRequestComment: (args: { data: { projectId: string } | { groupId: string }, handler: Handler }): Trigger => {
-            if ("projectId" in args.data) {
-                return {
-                    infrastructure: [
-                        new pulumi_gitlab.ProjectHook("on-merge-request-comment", {
-                            name: "Flow Hook",
-                            url: "https://domain/api/v1/gitlab/webhook",
-                            project: args.data.projectId,
-                            mergeRequestsEvents: true,
-                        }),
-                    ],
-                    handler: args.handler,
+        onMergeRequestComment: (args: GitLabMergeRequestCommentTriggerArgs): WebhookTrigger<GitLabMergeRequestCommentEvent> => {
+            if (!args.projectId && !args.groupId) {
+                throw new Error("Either projectId or groupId must be provided");
+            }
+
+            return {
+                type: 'webhook',
+                handler: args.handler,
+                path: '/webhooks/gitlab/merge-request-comment',
+                method: 'POST',
+                validation: async (event) => {
+                    // TODO: Implement GitLab webhook signature validation
+                    return true;
+                },
+                setup: async (ctx) => {
+                    // TODO: Register webhook with GitLab API
+                    console.log('Register GitLab webhook at:', ctx.webhookUrl);
                 }
             }
-            if ("groupId" in args.data) {
-                return {
-                    infrastructure: [
-                        new pulumi_gitlab.GroupHook("on-merge-request-comment", {
-                            name: "Flow Hook",
-                            group: args.data.groupId,
-                            mergeRequestsEvents: true,
-                            url: "https://domain/api/v1/gitlab/webhook",
-                        }),
-                    ],
-                    handler: args.handler,
-                }
-            }
-            throw new Error("Either projectId or groupId must be provided");
         }
     }
 }

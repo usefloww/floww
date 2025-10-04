@@ -6,10 +6,14 @@ SDK for building trigger-based workflows with dynamic TypeScript code execution.
 
 - **Dynamic Code Execution**: Execute TypeScript code at runtime with full module support
 - **Virtual File System**: Multi-file projects with import/export resolution
+- **Webhook Triggers**: Handle HTTP webhooks with custom paths and validation
+- **Cron Triggers**: Schedule tasks with cron expressions
+- **Auto-reload**: Development mode with automatic file watching
 - **TypeScript Support**: Full TypeScript transpilation with type checking
 - **Error Handling**: Meaningful stack traces with original file references
 - **Async/Await**: Full Promise support for asynchronous operations
 - **JSON Imports**: Native support for importing JSON configuration files
+- **Built-in Providers**: Builtin, GitLab, Google Calendar integrations
 
 ## Installation
 
@@ -34,7 +38,9 @@ echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN" >> .npmrc
 
 ## Usage
 
-### Basic Example
+### Dynamic Code Execution
+
+#### Basic Example
 
 ```typescript
 import { executeUserProject } from '@developerflows/floww-sdk';
@@ -57,7 +63,7 @@ const result = await executeUserProject({
 console.log(result); // 3
 ```
 
-### Multi-file Project
+#### Multi-file Project
 
 ```typescript
 const files = {
@@ -88,7 +94,7 @@ const result = await executeUserProject({
 });
 ```
 
-### Async Operations
+#### Async Operations
 
 ```typescript
 const files = {
@@ -104,6 +110,89 @@ const result = await executeUserProject({
   files,
   entryPoint: "async-main.handler"
 });
+```
+
+### Trigger-based Workflows
+
+#### Quick Start
+
+**1. Create a workflow file**
+
+Create a file `main.ts` with your triggers:
+
+```typescript
+import { Builtin } from "@developerflows/floww-sdk";
+
+const builtin = new Builtin();
+
+type CustomBody = {
+    message: string;
+}
+
+export default [
+    builtin.triggers.onWebhook<CustomBody>({
+        handler: (ctx, event) => {
+            console.log('Webhook received:', event.body.message);
+            console.log('Headers:', event.headers);
+        },
+        path: '/custom',
+    }),
+    builtin.triggers.onCron({
+        expression: "*/5 * * * * *",
+        handler: (ctx, event) => {
+            console.log('Cron triggered')
+        }
+    })
+]
+```
+
+**2. Run in development mode**
+
+```bash
+# Using the global command (if installed)
+floww dev main.ts
+
+# Or using pnpm script
+pnpm floww dev main.ts
+
+# With custom port/host
+pnpm floww dev main.ts --port 8080 --host 0.0.0.0
+```
+
+**3. Test your webhook**
+
+```bash
+curl -X POST http://localhost:3000/webhooks/custom \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello World"}'
+```
+
+## CLI Commands
+
+### `floww dev <file>`
+
+Run triggers in development mode with auto-reload on file changes.
+
+**Options:**
+- `-p, --port <port>` - Port for webhook server (default: 3000)
+- `-h, --host <host>` - Host for webhook server (default: localhost)
+
+**Example:**
+```bash
+pnpm floww dev examples/main.ts
+```
+
+### `floww start <file>`
+
+Run triggers in production mode.
+
+**Options:**
+- `-p, --port <port>` - Port for webhook server (default: 3000)
+- `-h, --host <host>` - Host for webhook server (default: 0.0.0.0)
+
+**Example:**
+```bash
+pnpm floww start examples/main.ts --port 8080
 ```
 
 ## Publishing Strategy
@@ -145,6 +234,83 @@ pnpm run build
 
 # Run in development mode
 pnpm run dev
+```
+
+## Triggers
+
+### Webhook Trigger
+
+Handle HTTP webhooks with custom paths and optional validation.
+
+```typescript
+builtin.triggers.onWebhook<TBody>({
+  handler: (ctx, event) => {
+    // event.body - Request body (typed as TBody)
+    // event.headers - Request headers
+    // event.query - Query parameters
+    // event.method - HTTP method
+    // event.path - Request path
+  },
+  path: '/custom',              // Webhook path (will be available at /webhooks/custom)
+  method: 'POST',               // HTTP method (default: POST)
+  validation: async (event) => { // Optional validation function
+    return event.headers['x-token'] === 'secret';
+  }
+})
+```
+
+### Cron Trigger
+
+Schedule tasks with cron expressions.
+
+```typescript
+builtin.triggers.onCron({
+  expression: "*/5 * * * * *",  // Every 5 seconds
+  handler: (ctx, event) => {
+    // Runs on schedule
+  }
+})
+```
+
+**Cron Expression Format:**
+```
+* * * * * *
+│ │ │ │ │ │
+│ │ │ │ │ └─ Day of week (0-7, 0 and 7 are Sunday)
+│ │ │ │ └─── Month (1-12)
+│ │ │ └───── Day of month (1-31)
+│ │ └─────── Hour (0-23)
+│ └───────── Minute (0-59)
+└─────────── Second (0-59, optional)
+```
+
+## Providers
+
+### Builtin
+
+Basic triggers included in the SDK.
+
+```typescript
+import { Builtin } from "@developerflows/floww-sdk";
+const builtin = new Builtin();
+```
+
+### GitLab
+
+GitLab integration for webhooks and events.
+
+```typescript
+import { Gitlab } from "@developerflows/floww-sdk";
+const gitlab = new Gitlab('your-access-token');
+```
+
+### Google Calendar
+
+Google Calendar integration.
+
+```typescript
+import { GoogleCalendar } from "@developerflows/floww-sdk";
+const calendar = new GoogleCalendar('user@example.com');
 ```
 
 ## API Reference
