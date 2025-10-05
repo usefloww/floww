@@ -1,0 +1,14 @@
+{
+  "name": "floww-sdk-example-1",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "floww dev main.ts"
+  },
+  "dependencies": {
+    "@DeveloperFlows/floww-sdk": "file:../.."
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

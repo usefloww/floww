@@ -8,12 +8,18 @@ importers:
 
   .:
     dependencies:
+      '@DeveloperFlows/floww-sdk':
+        specifier: 'link:'
+        version: 'link:'
       '@pulumi/gitlab':
         specifier: ^9.2.1
         version: 9.2.1(typescript@5.9.2)
       '@pulumi/pulumi':
         specifier: ^3.196.0
         version: 3.196.0(typescript@5.9.2)
+      centrifuge:
+        specifier: ^5.2.4
+        version: 5.4.0
       chokidar:
         specifier: ^4.0.3
         version: 4.0.3
@@ -908,6 +914,9 @@ packages:
     resolution: {integrity: sha512-v+p6ongsrp0yTGbJXjgxPow2+DL93DASP4kXCDKb8/bwRtt9OEF3whggkkDkGNzgcWy2XaF4a8nZglC7uElscg==}
     engines: {node: '>=8'}
 
+  centrifuge@5.4.0:
+    resolution: {integrity: sha512-XFRaOkljFN8GvN0Z+8g/nhlTf93PIF9nz9eWXuZ/OfviUkXuQfNpGzzQMAWMrrPnQCqVNXEK8WxJbproT2TSnw==}
+
   chai@5.3.3:
     resolution: {integrity: sha512-4zNhdJD/iOjSH0A05ea+Ke6MU5mmpQcbQsSOkgdaUMJ9zTlDTD/GYlwohmIE2u0gaxHYiVHEn1Fw9mZ/ktJWgw==}
     engines: {node: '>=18'}
@@ -1073,6 +1082,10 @@ packages:
 
   estree-walker@3.0.3:
     resolution: {integrity: sha512-7RUKfXgSMMkzt6ZuXmqapOurLGPPfgj6l9uRZ7lRGolvk0y2yocc35LdcxKC5PQZdn2DMqioAQ2NoWcrTKmm6g==}
+
+  events@3.3.0:
+    resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
+    engines: {node: '>=0.8.x'}
 
   execa@5.1.1:
     resolution: {integrity: sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg==}
@@ -2947,6 +2960,11 @@ snapshots:
       normalize-url: 6.1.0
       responselike: 2.0.1
 
+  centrifuge@5.4.0:
+    dependencies:
+      events: 3.3.0
+      protobufjs: 7.5.4
+
   chai@5.3.3:
     dependencies:
       assertion-error: 2.0.1
@@ -3117,6 +3135,8 @@ snapshots:
   estree-walker@3.0.3:
     dependencies:
       '@types/estree': 1.0.8
+
+  events@3.3.0: {}
 
   execa@5.1.1:
     dependencies:

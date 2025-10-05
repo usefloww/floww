@@ -44,8 +44,6 @@ export class ApiClient {
       };
     }
 
-    console.log(auth.accessToken);
-
     // Prepare request
     const url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
     const requestHeaders: Record<string, string> = {
@@ -53,6 +51,9 @@ export class ApiClient {
       'Authorization': `Bearer ${auth.accessToken}`,
       ...headers
     };
+
+    console.log(requestHeaders);
+    console.log(url);
 
     try {
       const response = await fetch(url, {

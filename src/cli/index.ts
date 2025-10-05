@@ -10,6 +10,7 @@ import {
   configResetCommand,
   configHelpCommand
 } from './commands/config';
+import { defaultApiClient } from './api/client';
 
 const program = new Command();
 

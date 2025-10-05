@@ -83,6 +83,51 @@ export type CronTriggerArgs = {
   teardown?: (ctx: CronTeardownContext) => Promise<void> | void;
 }
 
+// Realtime-specific trigger
+export type RealtimeEvent<TPayload = any> = {
+  type: string;
+  workflow_id: string;
+  payload: TPayload;
+  timestamp: string;
+  channel: string;
+}
+
+export type RealtimeContext = {
+  // Add realtime-specific context utilities here
+  // e.g., send response, get channel info, etc.
+}
+
+export interface RealtimeTrigger<TPayload = any> extends Trigger<RealtimeEvent<TPayload>, RealtimeContext> {
+  type: 'realtime';
+  handler: Handler<RealtimeEvent<TPayload>, RealtimeContext>;
+  channel: string;
+  messageType?: string; // Optional filter for specific message types
+  authentication?: () => Promise<string>; // JWT token provider function
+  setup?: (ctx: RealtimeSetupContext) => Promise<void> | void;
+  teardown?: (ctx: RealtimeTeardownContext) => Promise<void> | void;
+}
+
+export type RealtimeSetupContext = {
+  channel: string;
+  // Store metadata that can be used during teardown
+  setMetadata: (key: string, value: any) => void;
+}
+
+export type RealtimeTeardownContext = {
+  // Retrieve metadata stored during setup
+  getMetadata: (key: string) => any;
+}
+
+// Realtime trigger args
+export type RealtimeTriggerArgs<TPayload = any> = {
+  handler: Handler<RealtimeEvent<TPayload>, RealtimeContext>;
+  channel: string;
+  messageType?: string;
+  authentication?: () => Promise<string>;
+  setup?: (ctx: RealtimeSetupContext) => Promise<void> | void;
+  teardown?: (ctx: RealtimeTeardownContext) => Promise<void> | void;
+}
+
 export interface Action {}
 
 export type SecretDefinition = {

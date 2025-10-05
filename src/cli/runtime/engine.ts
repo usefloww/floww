@@ -1,23 +1,20 @@
-import path from 'path';
-import { pathToFileURL } from 'url';
-import { register } from 'tsx/esm/api';
-import { Trigger, WebhookTrigger, CronTrigger, Provider } from '../../common';
+import { Trigger, WebhookTrigger, CronTrigger, RealtimeTrigger, Provider } from '../../common';
 import { WebhookServer } from './server';
 import { CronScheduler } from './scheduler';
+import { WebSocketManager } from './websocket';
 import { SecretManager } from '../secrets/secretManager';
+import { executeUserProject, getUserProject } from '@/codeExecution';
 
-// Register tsx loader for TypeScript support
-const tsxUnregister = register({
-  namespace: Date.now().toString(),
-});
 
 export class FlowEngine {
   private server: WebhookServer;
   private scheduler: CronScheduler;
+  private wsManager: WebSocketManager | null = null;
   private triggers: Trigger[] = [];
   private secretManager: SecretManager;
   private providers: Set<Provider> = new Set();
   private webhookMetadata: Map<WebhookTrigger, Map<string, any>> = new Map();
+  private realtimeMetadata: Map<RealtimeTrigger, Map<string, any>> = new Map();
 
   constructor(private port: number, private host: string) {
     // TODO: Remove this, Temporary override to use ngrok
@@ -29,16 +26,9 @@ export class FlowEngine {
 
   async load(filePath: string): Promise<Trigger[]> {
     try {
-      // Resolve absolute path
-      const absolutePath = path.resolve(process.cwd(), filePath);
+      const userProject = await getUserProject(filePath, 'default');
+      const module = await executeUserProject(userProject);
 
-      // Convert to file URL for dynamic import
-      const fileUrl = pathToFileURL(absolutePath).href;
-
-      // Dynamically import the triggers file (tsx will handle TypeScript)
-      const module = await import(fileUrl);
-
-      // Get the default export (array of triggers)
       const triggers = module.default;
 
       if (!Array.isArray(triggers)) {
@@ -47,7 +37,6 @@ export class FlowEngine {
 
       this.triggers = triggers;
 
-      // Extract providers from the module
       this.extractProviders(module);
 
       return triggers;
@@ -89,12 +78,40 @@ export class FlowEngine {
     }
   }
 
+  private async initializeWebSocket() {
+    const realtimeTriggers = this.triggers.filter(t => t.type === 'realtime') as RealtimeTrigger[];
+
+    if (realtimeTriggers.length === 0) {
+      return; // No realtime triggers, skip WebSocket setup
+    }
+
+    // Initialize WebSocket manager
+    // Note: In production, these should come from configuration
+    const wsUrl = process.env.CENTRIFUGO_WS_URL || 'ws://localhost:8000/connection/websocket';
+
+    this.wsManager = new WebSocketManager({
+      url: wsUrl,
+      debug: process.env.NODE_ENV !== 'production'
+    });
+
+    try {
+      await this.wsManager.connect();
+      console.log(`🔗 WebSocket connection established`);
+    } catch (error) {
+      console.error('Failed to connect to WebSocket:', error);
+      throw error;
+    }
+  }
+
   async start() {
     console.log(`\n🚀 Starting Flow Engine...`);
     console.log(`📁 Loaded ${this.triggers.length} trigger(s)\n`);
 
     // Prompt for missing secrets
     await this.promptForMissingSecrets();
+
+    // Initialize WebSocket if needed
+    await this.initializeWebSocket();
 
     // Register all triggers BEFORE starting the server
     for (const trigger of this.triggers) {
@@ -125,11 +142,23 @@ export class FlowEngine {
         if (cronTrigger.teardown) {
           await cronTrigger.teardown({});
         }
+      } else if (trigger.type === 'realtime') {
+        const realtimeTrigger = trigger as RealtimeTrigger;
+        if (this.wsManager) {
+          await this.wsManager.unregisterTrigger(realtimeTrigger);
+        }
       }
     }
 
     await this.server.stop();
     this.scheduler.stopAll();
+
+    // Clean up WebSocket connection
+    if (this.wsManager) {
+      await this.wsManager.clearAll();
+      this.wsManager = null;
+    }
+
     console.log('\n👋 Flow Engine stopped');
   }
 
@@ -138,6 +167,8 @@ export class FlowEngine {
       await this.registerWebhook(trigger as WebhookTrigger);
     } else if (trigger.type === 'cron') {
       await this.registerCron(trigger as CronTrigger);
+    } else if (trigger.type === 'realtime') {
+      await this.registerRealtime(trigger as RealtimeTrigger);
     }
   }
 
@@ -176,6 +207,17 @@ export class FlowEngine {
     console.log(`⏰ Cron: ${trigger.expression}`);
   }
 
+  private async registerRealtime(trigger: RealtimeTrigger) {
+    if (!this.wsManager) {
+      throw new Error('WebSocket manager not initialized');
+    }
+
+    // Register with WebSocket manager
+    await this.wsManager.registerTrigger(trigger);
+
+    console.log(`📡 Realtime: ${trigger.channel} (${trigger.messageType || 'all messages'})`);
+  }
+
   async reload(filePath: string) {
     console.log('\n🔄 Reloading triggers...');
 
@@ -183,15 +225,24 @@ export class FlowEngine {
     this.scheduler.stopAll();
     this.server.clearWebhooks();
 
+    // Clean up WebSocket connections
+    if (this.wsManager) {
+      await this.wsManager.clearAll();
+      this.wsManager = null;
+    }
+
     // Clear module cache to force reload
-    const absolutePath = path.resolve(process.cwd(), filePath);
-    const fileUrl = pathToFileURL(absolutePath).href;
-    delete require.cache[fileUrl];
+    // const absolutePath = path.resolve(process.cwd(), filePath);
+    // const fileUrl = pathToFileURL(absolutePath).href;
+    // delete require.cache[fileUrl];
 
     // Reload triggers
     await this.load(filePath);
 
     console.log(`\n🚀 Reloading ${this.triggers.length} trigger(s)\n`);
+
+    // Re-initialize WebSocket if needed
+    await this.initializeWebSocket();
 
     // Re-register all triggers (server is still running)
     for (const trigger of this.triggers) {
