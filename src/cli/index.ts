@@ -11,6 +11,7 @@ import {
   configHelpCommand
 } from './commands/config';
 import { setConfig } from './config/configUtils';
+import { deployCommand } from './commands/deploy';
 
 const program = new Command();
 
@@ -36,6 +37,12 @@ program
   .option('-p, --port <port>', 'Port for webhook server', '3000')
   .option('-h, --host <host>', 'Host for webhook server', '0.0.0.0')
   .action(startCommand);
+
+program
+  .command('deploy')
+  .description('Deploy triggers to the server')
+  .argument('<file>', 'Path to the triggers file')
+  .action(deployCommand);
 
 program
   .command('login')
