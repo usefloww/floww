@@ -10,8 +10,6 @@ import {
   configResetCommand,
   configHelpCommand
 } from './commands/config';
-import { defaultApiClient } from './api/client';
-import { CentrifugoManager } from './runtime/centrifugo';
 import { setConfig } from './config/configUtils';
 
 const program = new Command();
@@ -53,13 +51,6 @@ program
   .command('whoami')
   .description('Show the current user')
   .action(whoamiCommand);
-
-program.command('test')
-  .description('Test the CLI')
-  .action(async () => {
-    const centrifugoManager = new CentrifugoManager();
-    await centrifugoManager.subscribeToWorkflow('b19f3998-3e7b-445c-8c2e-2873b7c93ce2');
-  });
 
 // Config commands
 const configCmd = program
