@@ -1,4 +1,8 @@
-import fetch from 'node-fetch';
+// Import fetch dynamically to handle ES module issues in bundled CLI
+async function getFetch() {
+  const { default: fetch } = await import('node-fetch');
+  return fetch;
+}
 import { getValidAuth } from '../auth/tokenUtils';
 import { getConfig } from '../config/configUtils';
 import { FlowwConfig } from '../config/configTypes';
@@ -52,6 +56,7 @@ export class ApiClient {
     console.log(url)
 
     try {
+      const fetch = await getFetch();
       const response = await fetch(url, {
         method,
         headers: requestHeaders,

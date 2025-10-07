@@ -21,7 +21,8 @@ program
   .description('CLI for running trigger-based workflows')
   .version('1.0.0')
   .option('--backend-url <url>', 'Backend API URL')
-  .option('--workos-client-id <id>', 'WorkOS client ID');
+  .option('--workos-client-id <id>', 'WorkOS client ID')
+  .option('--registry-url <url>', 'Docker registry URL');
 
 program
   .command('init')
@@ -30,12 +31,14 @@ program
   .option('--name <name>', 'Workflow name')
   .option('--namespace <id>', 'Namespace ID')
   .option('--description <desc>', 'Workflow description')
-  .action(initCommand);
+  .action(async (options) => {
+    await initCommand(options);
+  });
 
 program
   .command('dev')
   .description('Run triggers in development mode with auto-reload')
-  .argument('<file>', 'Path to the triggers file')
+  .argument('[file]', 'Path to the triggers file (defaults to entrypoint from floww.yaml)')
   .option('-p, --port <port>', 'Port for webhook server', '3000')
   .option('-h, --host <host>', 'Host for webhook server', 'localhost')
   .action(devCommand);
@@ -43,15 +46,14 @@ program
 program
   .command('start')
   .description('Run triggers in production mode')
-  .argument('<file>', 'Path to the triggers file')
+  .argument('[file]', 'Path to the triggers file (defaults to entrypoint from floww.yaml)')
   .option('-p, --port <port>', 'Port for webhook server', '3000')
   .option('-h, --host <host>', 'Host for webhook server', '0.0.0.0')
   .action(startCommand);
 
 program
   .command('deploy')
-  .description('Deploy triggers to the server')
-  .argument('<file>', 'Path to the triggers file')
+  .description('Deploy triggers to the server (uses entrypoint from floww.yaml)')
   .action(deployCommand);
 
 program
@@ -106,6 +108,7 @@ program.hook('preAction', (thisCommand) => {
 
   if (opts.backendUrl) cliOptions.backendUrl = opts.backendUrl;
   if (opts.workosClientId) cliOptions.workosClientId = opts.workosClientId;
+  if (opts.registryUrl) cliOptions.registryUrl = opts.registryUrl;
 
   setConfig(cliOptions);
 });

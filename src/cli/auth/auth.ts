@@ -1,4 +1,8 @@
-import fetch from 'node-fetch';
+// Import fetch dynamically to handle ES module issues in bundled CLI
+async function getFetch() {
+  const { default: fetch } = await import('node-fetch');
+  return fetch;
+}
 import open from 'open';
 import { DeviceAuthResponse, StoredAuth, TokenResponse } from './authTypes';
 
@@ -62,6 +66,7 @@ export class CLIAuth {
   }
 
   private async requestDeviceCode(): Promise<DeviceAuthResponse> {
+    const fetch = await getFetch();
     const response = await fetch(`${this.apiUrl}/user_management/authorize/device`, {
       method: 'POST',
       headers: {
@@ -93,6 +98,7 @@ export class CLIAuth {
       await this.sleep(pollInterval * 1000);
 
       try {
+        const fetch = await getFetch();
         const response = await fetch(`${this.apiUrl}/user_management/authenticate`, {
           method: 'POST',
           headers: {
@@ -141,6 +147,7 @@ export class CLIAuth {
   }
 
   async refreshAccessToken(refreshToken: string): Promise<StoredAuth> {
+    const fetch = await getFetch();
     const response = await fetch(`${this.apiUrl}/user_management/authenticate`, {
       method: 'POST',
       headers: {

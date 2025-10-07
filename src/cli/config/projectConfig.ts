@@ -8,6 +8,7 @@ export interface ProjectConfig {
   name: string;
   description?: string;
   version?: string;
+  entrypoint?: string;
 }
 
 const CONFIG_FILENAME = 'floww.yaml';

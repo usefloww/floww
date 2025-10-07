@@ -3,6 +3,7 @@ export interface FlowwConfig {
   backendUrl: string;
   workosApiUrl: string;
   websocketUrl: string;
+  registryUrl: string;
 }
 
 export interface ConfigSource {
@@ -15,6 +16,7 @@ export interface ConfigWithSources {
   backendUrl: ConfigSource;
   workosApiUrl: ConfigSource;
   websocketUrl: ConfigSource;
+  registryUrl: ConfigSource;
 }
 
 interface ConfigField {
@@ -43,6 +45,11 @@ export const CONFIG_SCHEMA = {
     default: "https://api.workos.com",
     envVar: "WORKOS_API_URL",
     cliKey: "workos-api-url",
+  },
+  registryUrl: {
+    default: "registry.flow.toondn.app",
+    envVar: "FLOWW_REGISTRY_URL",
+    cliKey: "registry-url",
   },
 } as const satisfies Record<keyof FlowwConfig, ConfigField>;
 

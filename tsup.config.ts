@@ -16,6 +16,10 @@ export default defineConfig([
     dts: true,
     outDir: 'dist',
     clean: false,
+    esbuildOptions: (options) => {
+      options.jsx = 'automatic';
+      return options;
+    },
     external: [
       'tsx',
       'commander',
@@ -26,6 +30,8 @@ export default defineConfig([
       'node-fetch',
       'open',
       'inquirer',
+      'react',
+      'ink',
     ],
     noExternal: [],
   },
