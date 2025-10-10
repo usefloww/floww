@@ -77,42 +77,24 @@ importers:
         version: 2.1.9(@types/node@24.6.2)
 
   examples/1_cron:
-    dependencies:
-      '@DeveloperFlows/floww-sdk':
-        specifier: file:../..
-        version: file:(@types/node@24.6.2)(react@19.2.0)(typescript@5.9.2)
     devDependencies:
       tsx:
         specifier: ^4.19.2
         version: 4.20.5
 
   examples/2_webhook:
-    dependencies:
-      '@DeveloperFlows/floww-sdk':
-        specifier: file:../..
-        version: file:(@types/node@24.6.2)(react@19.2.0)(typescript@5.9.2)
     devDependencies:
       tsx:
         specifier: ^4.19.2
         version: 4.20.5
 
   examples/3_gitlab:
-    dependencies:
-      '@DeveloperFlows/floww-sdk':
-        specifier: workspace:*
-        version: link:../..
     devDependencies:
       tsx:
         specifier: ^4.19.2
         version: 4.20.5
 
 packages:
-
-  '@DeveloperFlows/floww-sdk@file:':
-    resolution: {directory: '', type: directory}
-    hasBin: true
-    peerDependencies:
-      typescript: '>=5.0.0'
 
   '@alcalzone/ansi-tokenize@0.2.0':
     resolution: {integrity: sha512-qI/5TaaaCZE4yeSZ83lu0+xi1r88JSxUjnH4OP/iZF7+KKZ75u3ee5isd0LxX+6N8U0npL61YrpbthILHB6BnA==}
@@ -2568,35 +2550,6 @@ packages:
     resolution: {integrity: sha512-0LPOt3AxKqMdFBZA3HBAt/t/8vIKq7VaQYbuA8WxCgung+p9TVyKRYdpvCb80HcdTN2NkbIKbhNwKUfm3tQywQ==}
 
 snapshots:
-
-  '@DeveloperFlows/floww-sdk@file:(@types/node@24.6.2)(react@19.2.0)(typescript@5.9.2)':
-    dependencies:
-      '@DeveloperFlows/floww-sdk': 'link:'
-      '@pulumi/gitlab': 9.2.1(typescript@5.9.2)
-      '@pulumi/pulumi': 3.196.0(typescript@5.9.2)
-      '@types/inquirer': 9.0.9
-      centrifuge: 5.4.0
-      chokidar: 4.0.3
-      commander: 14.0.1
-      fastify: 5.6.1
-      ink: 6.3.1(react@19.2.0)
-      inquirer: 12.9.6(@types/node@24.6.2)
-      js-yaml: 4.1.0
-      node-cron: 4.2.1
-      node-fetch: 3.3.2
-      open: 10.2.0
-      pino-pretty: 13.1.1
-      typescript: 5.9.2
-    transitivePeerDependencies:
-      - '@types/node'
-      - '@types/react'
-      - bluebird
-      - bufferutil
-      - react
-      - react-devtools-core
-      - supports-color
-      - ts-node
-      - utf-8-validate
 
   '@alcalzone/ansi-tokenize@0.2.0':
     dependencies:
