@@ -12,6 +12,7 @@ import {
 import { setConfig } from './config/configUtils';
 import { deployCommand } from './commands/deploy';
 import { initCommand } from './commands/init';
+import { listWorkflowsCommand, listNamespacesCommand } from './crud/list';
 
 const program = new Command();
 
@@ -91,6 +92,21 @@ configCmd
   .command('help')
   .description('Show configuration help')
   .action(configHelpCommand);
+
+// List commands
+const listCmd = program
+  .command('list')
+  .description('List resources');
+
+listCmd
+  .command('workflows')
+  .description('List all workflows')
+  .action(listWorkflowsCommand);
+
+listCmd
+  .command('namespaces')
+  .description('List all namespaces')
+  .action(listNamespacesCommand);
 
 // Initialize config with CLI options before parsing commands
 program.hook('preAction', (thisCommand) => {

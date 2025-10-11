@@ -1,4 +1,5 @@
 import { loadTokens } from '../auth/authUtils';
+import { getValidAuth } from '../auth/tokenUtils';
 import { getConfigValue } from '../config/configUtils';
 
 // Import fetch dynamically to handle ES module issues in bundled CLI
@@ -55,8 +56,9 @@ export interface PushTokenResponse {
 
 // Helper function to make authenticated API calls
 async function makeApiCall<T>(endpoint: string, options: any = {}): Promise<T> {
-  const tokens = loadTokens();
-  if (!tokens) {
+  const auth = await getValidAuth();
+
+  if (!auth) {
     throw new Error('Not logged in. Please run "floww login" first.');
   }
 
@@ -66,7 +68,7 @@ async function makeApiCall<T>(endpoint: string, options: any = {}): Promise<T> {
   const response = await fetch(`${backendUrl}/api${endpoint}`, {
     ...options,
     headers: {
-      'Authorization': `Bearer ${tokens.accessToken}`,
+      'Authorization': `Bearer ${auth.accessToken}`,
       'Content-Type': 'application/json',
       ...options.headers,
     },

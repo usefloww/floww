@@ -4,7 +4,25 @@ async function getFetch() {
   return fetch;
 }
 import open from 'open';
+import jwt from 'jsonwebtoken';
 import { DeviceAuthResponse, StoredAuth, TokenResponse } from './authTypes';
+
+function extractExpirationFromJWT(accessToken: string): number {
+  try {
+    const decoded = jwt.decode(accessToken) as jwt.JwtPayload;
+
+    if (!decoded || !decoded.exp) {
+      throw new Error('JWT missing exp field');
+    }
+
+    // Convert from seconds to milliseconds
+    return decoded.exp * 1000;
+  } catch (error) {
+    console.warn('⚠️  Failed to parse JWT expiration, using fallback');
+    // Fallback to 30 minutes from now
+    return Date.now() + 30 * 60 * 1000;
+  }
+}
 
 
 export class CLIAuth {
@@ -47,15 +65,8 @@ export class CLIAuth {
     console.log('✅ Successfully authenticated!');
     console.log(`👤 Logged in as: ${tokens.user.email}\n`);
 
-    // Calculate expiration time
-    // WorkOS tokens typically expire in 1800 seconds (30 minutes)
-    const expiresInSeconds = tokens.expires_in || 1800; // Default to 30 min if not provided
-    const expiresAt = Date.now() + expiresInSeconds * 1000;
-
-    // Debug logging
-    if (!tokens.expires_in) {
-      console.warn('⚠️  Token response missing expires_in, using default 30 minutes');
-    }
+    // Extract expiration time from JWT
+    const expiresAt = extractExpirationFromJWT(tokens.access_token);
 
     return {
       accessToken: tokens.access_token,
@@ -165,12 +176,9 @@ export class CLIAuth {
     }
 
     const tokens = await response.json() as TokenResponse;
-    const expiresInSeconds = tokens.expires_in || 1800; // Default to 30 min if not provided
-    const expiresAt = Date.now() + expiresInSeconds * 1000;
 
-    if (!tokens.expires_in) {
-      console.warn('⚠️  Token refresh response missing expires_in, using default 30 minutes');
-    }
+    // Extract expiration time from JWT
+    const expiresAt = extractExpirationFromJWT(tokens.access_token);
 
     return {
       accessToken: tokens.access_token,

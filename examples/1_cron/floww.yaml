@@ -1,5 +1,5 @@
-namespaceId: 599af99a-fa79-46ff-83a2-8656b7cad5f4
-workflowId: 9ad8dfa7-9e11-405c-9223-a84e133a4975
+namespaceId: 9279d98b-362c-43d5-a9de-d8c91e898f0e
+workflowId: b19f3998-3e7b-445c-8c2e-2873b7c93ce2
 name: Test Cron
 version: 1.0.0
 entrypoint: main.ts
