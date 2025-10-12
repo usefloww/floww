@@ -1,4 +1,4 @@
-import { fetchWorkflows, fetchNamespaces, type Workflow, type Namespace } from '../api/apiMethods';
+import { fetchWorkflows, fetchNamespaces, listWorkflowDeployments, type Workflow, type Namespace, type WorkflowDeploymentResponse } from '../api/apiMethods';
 import Table from 'cli-table3';
 import chalk from 'chalk';
 import logSymbols from 'log-symbols';
@@ -133,6 +133,86 @@ export async function listNamespacesCommand() {
     console.log('\n' + table.toString());
   } catch (error) {
     console.error(`${logSymbols.error} ${chalk.red('Failed to fetch namespaces:')} ${error}`);
+    process.exit(1);
+  }
+}
+
+function formatStatus(status: string): string {
+  switch (status.toLowerCase()) {
+    case 'active':
+      return chalk.green('Active');
+    case 'inactive':
+      return chalk.yellow('Inactive');
+    case 'failed':
+      return chalk.red('Failed');
+    default:
+      return chalk.dim(status);
+  }
+}
+
+export async function listDeploymentsCommand(workflowId?: string) {
+  try {
+    console.log(`${logSymbols.info} ${chalk.blue('Fetching deployments...')}`);
+    const deployments = await listWorkflowDeployments(workflowId);
+
+    if (deployments.length === 0) {
+      const message = workflowId
+        ? `No deployments found for workflow ${workflowId}`
+        : 'No deployments found';
+      console.log(`\n${logSymbols.warning} ${chalk.yellow(message)}`);
+      return;
+    }
+
+    const table = new Table({
+      head: [
+        chalk.gray('WORKFLOW'),
+        chalk.gray('RUNTIME'),
+        chalk.gray('STATUS'),
+        chalk.gray('DEPLOYED'),
+        chalk.gray('DEPLOYMENT ID')
+      ],
+      style: {
+        head: [],
+        border: []
+      },
+      chars: {
+        'top': '',
+        'top-mid': '',
+        'top-left': '',
+        'top-right': '',
+        'bottom': '',
+        'bottom-mid': '',
+        'bottom-left': '',
+        'bottom-right': '',
+        'left': '',
+        'left-mid': '',
+        'mid': '',
+        'mid-mid': '',
+        'right': '',
+        'right-mid': '',
+        'middle': ' '
+      }
+    });
+
+    deployments.forEach((deployment: WorkflowDeploymentResponse) => {
+      table.push([
+        chalk.white(deployment.workflow_name || truncateText(deployment.workflow_id, 12)),
+        chalk.cyan(deployment.runtime_name || truncateText(deployment.runtime_id, 12)),
+        formatStatus(deployment.status),
+        chalk.green(formatDate(deployment.deployed_at)),
+        chalk.dim(deployment.id.substring(0, 8))
+      ]);
+    });
+
+    console.log('\n' + table.toString());
+
+    // Show summary info
+    const activeCount = deployments.filter(d => d.status.toLowerCase() === 'active').length;
+    const totalCount = deployments.length;
+    console.log(`\n${chalk.dim(`Total: ${totalCount} deployments, ${activeCount} active`)}`);
+
+  } catch (error) {
+    console.error(`${logSymbols.error} ${chalk.red('Failed to fetch deployments:')} ${error}`);
     process.exit(1);
   }
 }

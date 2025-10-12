@@ -12,7 +12,7 @@ import {
 import { setConfig } from './config/configUtils';
 import { deployCommand } from './commands/deploy';
 import { initCommand } from './commands/init';
-import { listWorkflowsCommand, listNamespacesCommand } from './crud/list';
+import { listWorkflowsCommand, listNamespacesCommand, listDeploymentsCommand } from './crud/list';
 
 const program = new Command();
 
@@ -109,6 +109,14 @@ listCmd
   .command('namespaces')
   .description('List all namespaces')
   .action(listNamespacesCommand);
+
+listCmd
+  .command('deployments')
+  .description('List workflow deployments')
+  .option('-w, --workflow <id>', 'Filter by workflow ID')
+  .action(async (options) => {
+    await listDeploymentsCommand(options.workflow);
+  });
 
 // Initialize config with CLI options before parsing commands
 program.hook('preAction', (thisCommand) => {

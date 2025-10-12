@@ -1,10 +1,29 @@
-import { execSync } from 'child_process';
-import fs from 'fs';
-import path from 'path';
-import { loadProjectConfig, hasProjectConfig, updateProjectConfig } from '../config/projectConfig';
-import { getPushToken, createRuntime, updateTriggerCode, fetchWorkflows } from '../api/apiMethods';
-import { getConfigValue } from '../config/configUtils';
-import { initCommand } from './init';
+import fs from "fs";
+import path from "path";
+import {
+  loadProjectConfig,
+  hasProjectConfig,
+  updateProjectConfig,
+} from "../config/projectConfig";
+import {
+  ImageAlreadyExistsError,
+  createRuntime,
+  getRuntimeStatus,
+  createWorkflowDeployment,
+  readProjectFiles,
+  fetchWorkflows,
+  getPushData,
+  PushTokenResponse,
+  RuntimeAlreadyExistsError,
+} from "../api/apiMethods";
+import { initCommand } from "./init";
+import {
+  dockerBuildImage,
+  dockerRetagImage,
+  dockerLogin,
+  dockerPushImage,
+  dockerGetImageHash,
+} from "../utils/dockerUtils";
 
 const defaultDockerfileContent = `
 FROM base-floww
@@ -18,121 +37,97 @@ ENV FLOWW_ENTRYPOINT=main.ts
 
 # No source code copying - code will be provided via Lambda event payload
 # Uses the universal handler from base-floww image
-`
-
-interface DockerBuildResult {
-  imageTag: string;
-  identifierTag: string;
-  imageHash: string;
-}
+`;
 
 function ensureDockerfile(projectDir: string, projectConfig: any): string {
-  const dockerfilePath = path.join(projectDir, 'Dockerfile');
+  const dockerfilePath = path.join(projectDir, "Dockerfile");
 
   if (!fs.existsSync(dockerfilePath)) {
-    console.log('📄 No Dockerfile found, creating default...');
-    const entrypoint = projectConfig.entrypoint || 'main.ts';
-    const dockerfileContent = defaultDockerfileContent.replace('ENV FLOWW_ENTRYPOINT=main.ts', `ENV FLOWW_ENTRYPOINT=${entrypoint}`);
+    console.log("📄 No Dockerfile found, creating default...");
+    const entrypoint = projectConfig.entrypoint || "main.ts";
+    const dockerfileContent = defaultDockerfileContent.replace(
+      "ENV FLOWW_ENTRYPOINT=main.ts",
+      `ENV FLOWW_ENTRYPOINT=${entrypoint}`
+    );
     fs.writeFileSync(dockerfilePath, dockerfileContent.trim());
-    console.log('✅ Created default Dockerfile');
+    console.log("✅ Created default Dockerfile");
   }
 
   return dockerfilePath;
 }
 
-function buildDockerImage(projectConfig: any, projectDir: string): DockerBuildResult {
-  const version = projectConfig.version || 'latest';
-  const registryUrl = getConfigValue('registryUrl');
+async function pollRuntimeUntilReady(runtimeId: string): Promise<void> {
+  console.log("⏳ Waiting for runtime to be ready...");
 
-  // Use trigger-lambda as the image name format
-  const imageTag = `${registryUrl}/trigger-lambda:${version}`;
+  let lastLogCount = 0;
 
-  // Tag with namespace and workflow for identification
-  const identifierTag = `${registryUrl}/trigger-lambda:${projectConfig.namespaceId}-${projectConfig.workflowId || 'unknown'}`;
+  while (true) {
+    try {
+      const status = await getRuntimeStatus(runtimeId);
 
-  console.log(`🐳 Building Docker image: ${imageTag}`);
-  console.log(`   Additional tag: ${identifierTag}`);
+      // Display new logs if any
+      if (status.creation_logs && status.creation_logs.length > lastLogCount) {
+        const newLogs = status.creation_logs.slice(lastLogCount);
+        for (const log of newLogs) {
+          const timestamp = new Date(log.timestamp).toLocaleTimeString();
+          const level = log.level || "info";
+          const levelIcon =
+            level === "error" ? "❌" : level === "warning" ? "⚠️" : "ℹ️";
+          console.log(`   ${levelIcon} [${timestamp}] ${log.message}`);
+        }
+        lastLogCount = status.creation_logs.length;
+      }
 
-  try {
-    // Build the image with multiple tags
-    execSync(`docker build -t "${imageTag}" -t "${identifierTag}" .`, {
-      cwd: projectDir,
-      stdio: 'inherit'
-    });
+      // Check final status
+      if (status.creation_status === "completed") {
+        console.log("✅ Runtime is ready!");
+        return;
+      } else if (status.creation_status === "failed") {
+        console.error("❌ Runtime creation failed");
+        process.exit(1);
+      }
 
-    // Get image hash
-    const imageHashOutput = execSync(`docker images --no-trunc --quiet "${imageTag}"`, {
-      encoding: 'utf-8'
-    });
-    const imageHash = imageHashOutput.trim();
-
-    console.log(`✅ Built image with hash: ${imageHash}`);
-
-    return {
-      imageTag,
-      identifierTag,
-      imageHash
-    };
-  } catch (error) {
-    console.error('❌ Docker build failed:', error);
-    process.exit(1);
+      // Wait 5 seconds before next poll
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+    } catch (error) {
+      console.error(
+        "❌ Failed to check runtime status:",
+        error instanceof Error ? error.message : error
+      );
+      process.exit(1);
+    }
   }
 }
-
-
-function pushDockerImage(imageTag: string, identifierTag: string, token: string): void {
-  console.log('🔐 Logging in to registry...');
-  const registryUrl = getConfigValue('registryUrl');
-
-  try {
-    // Login to registry
-    execSync(`echo "${token}" | docker login ${registryUrl} -u token --password-stdin`, {
-      stdio: ['pipe', 'inherit', 'inherit']
-    });
-
-    console.log('📤 Pushing images...');
-
-    // Push both tags
-    execSync(`docker push "${imageTag}"`, {
-      stdio: 'inherit'
-    });
-
-    execSync(`docker push "${identifierTag}"`, {
-      stdio: 'inherit'
-    });
-
-    console.log('✅ Images pushed successfully!');
-  } catch (error) {
-    console.error('❌ Docker push failed:', error);
-    process.exit(1);
-  }
-}
-
 
 async function selectWorkflow(): Promise<string> {
   const workflows = await fetchWorkflows();
 
   if (workflows.length === 0) {
-    console.error('❌ No workflows found. Create one first in the Floww dashboard.');
+    console.error(
+      "❌ No workflows found. Create one first in the Floww dashboard."
+    );
     process.exit(1);
   }
 
-  console.log('\n📋 Select a workflow to deploy to:');
+  console.log("\n📋 Select a workflow to deploy to:");
   workflows.forEach((workflow, index) => {
-    console.log(`  ${index + 1}. ${workflow.name}${workflow.namespace_name ? ` (${workflow.namespace_name})` : ''}${workflow.description ? ` - ${workflow.description}` : ''}`);
+    console.log(
+      `  ${index + 1}. ${workflow.name}${
+        workflow.namespace_name ? ` (${workflow.namespace_name})` : ""
+      }${workflow.description ? ` - ${workflow.description}` : ""}`
+    );
   });
 
   // For now, return the first workflow as default
   // TODO: Implement proper interactive selection
   const selectedWorkflow = workflows[0];
   console.log(`\n✅ Selected: ${selectedWorkflow.name}`);
-  console.log('💡 Tip: Run "floww init" to set a default workflow for this project');
+  console.log(
+    '💡 Tip: Run "floww init" to set a default workflow for this project'
+  );
 
   return selectedWorkflow.id;
 }
-
-
-
 
 /**
  * Deploy the triggers to the server
@@ -140,7 +135,7 @@ async function selectWorkflow(): Promise<string> {
  * - Check workflow id to deploy to (read from floww.yaml)
  *    - if not provided, ask user to select a workflow from list or create new one
  *    - if provided, check if workflow exists
- * 
+ *
  * - Update the runtime if needed
  *    - build the runtime docker image (build with default if Dockerfile is not provided)
  *    - get token to push to docker registry
@@ -155,13 +150,18 @@ export async function deployCommand() {
 
   // Auto-initialize if no config exists
   if (!hasProjectConfig()) {
-    console.log('🚀 No project configuration found. Let\'s set up your project first!\n');
+    console.log(
+      "🚀 No project configuration found. Let's set up your project first!\n"
+    );
 
     try {
       await initCommand({ silent: false });
-      console.log('\n🚀 Continuing with deployment...\n');
+      console.log("\n🚀 Continuing with deployment...\n");
     } catch (error) {
-      console.error('❌ Initialization failed:', error instanceof Error ? error.message : error);
+      console.error(
+        "❌ Initialization failed:",
+        error instanceof Error ? error.message : error
+      );
       process.exit(1);
     }
   }
@@ -172,16 +172,19 @@ export async function deployCommand() {
 
   // Handle workflow selection if workflowId is missing (fallback)
   if (!projectConfig.workflowId) {
-    console.log('📋 No workflowId specified, selecting workflow...');
+    console.log("📋 No workflowId specified, selecting workflow...");
 
     try {
       const selectedWorkflowId = await selectWorkflow();
 
       // Update floww.yaml with selected workflow
       projectConfig = updateProjectConfig({ workflowId: selectedWorkflowId });
-      console.log('✅ Workflow saved to floww.yaml');
+      console.log("✅ Workflow saved to floww.yaml");
     } catch (error) {
-      console.error('❌ Workflow selection failed:', error instanceof Error ? error.message : error);
+      console.error(
+        "❌ Workflow selection failed:",
+        error instanceof Error ? error.message : error
+      );
       process.exit(1);
     }
   }
@@ -190,53 +193,83 @@ export async function deployCommand() {
   ensureDockerfile(projectDir, projectConfig);
 
   // 2. Build Docker image
-  const buildResult = buildDockerImage(projectConfig, projectDir);
+  const buildResult = dockerBuildImage(projectConfig, projectDir);
+  const imageHash = dockerGetImageHash({ localImage: buildResult.localImage });
 
-  // 3. Get push token from backend
-  const registryUrl = getConfigValue('registryUrl');
-  const imageTagRegex = new RegExp(`${registryUrl.replace('.', '\\.')}\\/(.+):(.+)`);
-  const [, imageName, tag] = buildResult.imageTag.match(imageTagRegex) || [];
-  if (!imageName || !tag) {
-    console.error('❌ Failed to parse image tag');
-    process.exit(1);
+  let shouldPush = true;
+  let pushData: PushTokenResponse = {} as any;
+
+  try {
+    pushData = await getPushData(imageHash);
+  } catch (error) {
+    if (error instanceof ImageAlreadyExistsError) {
+      console.log("♻️ Image already exists in registry, skipping push...");
+      shouldPush = false;
+    } else {
+      console.error(
+        "❌ Failed to get push token:",
+        error instanceof Error ? error.message : error
+      );
+      process.exit(1);
+    }
   }
 
-  const pushToken = await getPushToken(imageName, tag);
+  // 4. Push images to registry (only if needed)
+  if (shouldPush) {
+    const imageUri = `${pushData.registry_url}:${imageHash}`;
+    dockerRetagImage({ currentTag: buildResult.localImage, newTag: imageUri });
+    dockerLogin({
+      registryUrl: pushData.registry_url,
+      token: pushData.password,
+    });
+    dockerPushImage({ imageUri: imageUri });
+  }
 
-  // 4. Push images to registry
-  pushDockerImage(buildResult.imageTag, buildResult.identifierTag, pushToken);
-
-  // 5. Create runtime and deployment
-  const runtimeResult = await createRuntime({
-    workflow_id: projectConfig.workflowId!,
-    image_uri: buildResult.imageTag,
-    hash: buildResult.imageHash,
-    name: projectConfig.name,
-    version: projectConfig.version || 'latest',
-    config: {
-      dockerfile_created: !fs.existsSync(path.join(process.cwd(), 'Dockerfile')),
-      project_config: projectConfig
+  // 5. Create runtime
+  console.log("🔧 Creating runtime...");
+  console.log(buildResult);
+  try {
+    const runtimeResult = await createRuntime({
+      config: {
+        image_hash: imageHash,
+      },
+    });
+  } catch (error) {
+    if (error instanceof RuntimeAlreadyExistsError) {
+      console.log("♻️ Runtime already exists");
+    } else {
+      console.error(
+        "❌ Failed to create runtime:",
+        error instanceof Error ? error.message : error
+      );
+      process.exit(1);
     }
+  }
+
+  console.log("✅ Runtime creation started!");
+  console.log(`   Runtime ID: ${runtimeResult.id}`);
+  console.log(`   Status: ${runtimeResult.creation_status}`);
+
+  // 6. Poll runtime status until completion
+  await pollRuntimeUntilReady(runtimeResult.id);
+
+  // 7. Read project files and create workflow deployment
+  const entrypoint = projectConfig.entrypoint || "main.ts";
+  console.log(`📝 Reading project code with entrypoint: ${entrypoint}`);
+
+  const userCode = await readProjectFiles(projectDir, entrypoint);
+
+  console.log("🚀 Creating workflow deployment...");
+  const deploymentResult = await createWorkflowDeployment({
+    workflow_id: projectConfig.workflowId!,
+    runtime_id: runtimeResult.id,
+    code: userCode,
   });
 
-  console.log('✅ Runtime created successfully!');
-  console.log(`   Runtime ID: ${runtimeResult.runtime_id}`);
-  console.log(`   Deployment ID: ${runtimeResult.deployment_id}`);
-  console.log(`   Status: ${runtimeResult.status}`);
+  console.log("✅ Workflow deployment created successfully!");
+  console.log(`   Deployment ID: ${deploymentResult.id}`);
+  console.log(`   Status: ${deploymentResult.status}`);
+  console.log(`   Deployed At: ${deploymentResult.deployed_at}`);
 
-  if (runtimeResult.reused_existing) {
-    console.log('♻️ Reused existing runtime with matching hash');
-  }
-
-  // 6. Update trigger code using entrypoint from config
-  const entrypoint = projectConfig.entrypoint || 'main.ts';
-
-  console.log(`📝 Uploading project code with entrypoint: ${entrypoint}`);
-  await updateTriggerCode(projectConfig.workflowId!, projectDir, entrypoint);
-
-  console.log('\n🎉 Deploy completed successfully!');
+  console.log("\n🎉 Deploy completed successfully!");
 }
-
-
-
-
