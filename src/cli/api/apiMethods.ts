@@ -85,7 +85,10 @@ export interface PushTokenResponse {
 }
 
 // Helper function to make authenticated API calls
-async function makeApiCall<T>(endpoint: string, options: any = {}): Promise<T> {
+async function makeApiCall(
+  endpoint: string,
+  options: any = {}
+): Promise<Response> {
   const auth = await getValidAuth();
 
   if (!auth) {
@@ -95,7 +98,7 @@ async function makeApiCall<T>(endpoint: string, options: any = {}): Promise<T> {
   const fetch = await getFetch();
   const backendUrl = getConfigValue("backendUrl");
 
-  const response = await fetch(`${backendUrl}/api${endpoint}`, {
+  return await fetch(`${backendUrl}/api${endpoint}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${auth.accessToken}`,
@@ -103,25 +106,34 @@ async function makeApiCall<T>(endpoint: string, options: any = {}): Promise<T> {
       ...options.headers,
     },
   });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`HTTP ${response.status}: ${errorText}`);
-  }
-
-  return (await response.json()) as T;
 }
 
 // Namespace API methods
 export async function fetchNamespaces(): Promise<Namespace[]> {
-  const data = await makeApiCall<{ namespaces: Namespace[] }>("/namespaces");
+  const response = await makeApiCall("/namespaces");
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+  const data = (await response.json()) as { namespaces: Namespace[] };
   return data.namespaces;
 }
 
 // Workflow API methods
 export async function fetchWorkflows(): Promise<Workflow[]> {
-  const data = await makeApiCall<{ workflows: Workflow[] }>("/workflows");
+  const response = await makeApiCall("/workflows");
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+  const data = (await response.json()) as { workflows: Workflow[] };
   return data.workflows;
+}
+
+export async function fetchWorkflow(workflowId: string): Promise<Workflow> {
+  const response = await makeApiCall(`/workflows/${workflowId}`);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+  return (await response.json()) as Workflow;
 }
 
 export async function createWorkflow(
@@ -129,7 +141,7 @@ export async function createWorkflow(
   namespaceId: string,
   description?: string
 ): Promise<Workflow> {
-  return await makeApiCall<Workflow>("/workflows", {
+  const response = await makeApiCall("/workflows", {
     method: "POST",
     body: JSON.stringify({
       name,
@@ -137,6 +149,10 @@ export async function createWorkflow(
       description,
     }),
   });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+  return (await response.json()) as Workflow;
 }
 
 // Helper function to read project files
@@ -147,8 +163,6 @@ export async function readProjectFiles(
   // Import fs and path dynamically to handle bundling issues
   const fs = await import("fs/promises");
   const path = await import("path");
-
-  console.log("📝 Reading project files...");
 
   // Read all files in the project directory recursively
   const files: Record<string, string> = {};
@@ -187,8 +201,6 @@ export async function readProjectFiles(
 
   await readDirectory(projectDir);
 
-  console.log(`📦 Collected ${Object.keys(files).length} files`);
-
   return {
     files,
     entrypoint,
@@ -207,28 +219,30 @@ export class ImageAlreadyExistsError extends Error {
 export async function getPushData(
   image_hash: string
 ): Promise<PushTokenResponse> {
-  try {
-    const data = await makeApiCall<PushTokenResponse>("/runtimes/push_token", {
-      method: "POST",
-      body: JSON.stringify({
-        image_hash: image_hash,
-      }),
-    });
-    return data;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("HTTP 409")) {
-      throw new ImageAlreadyExistsError("Image already exists in registry");
-    }
-    throw error;
+  const response = await makeApiCall("/runtimes/push_token", {
+    method: "POST",
+    body: JSON.stringify({
+      image_hash: image_hash,
+    }),
+  });
+
+  if (response.status === 409) {
+    throw new ImageAlreadyExistsError("Image already exists in registry");
   }
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+
+  return (await response.json()) as PushTokenResponse;
 }
 
 export class RuntimeAlreadyExistsError extends Error {
-  id: string;
+  runtimeId: string;
 
-  constructor(id: string, message: string) {
+  constructor(runtimeId: string, message: string) {
     super(message);
-    this.id = id;
+    this.runtimeId = runtimeId;
     this.name = "RuntimeAlreadyExistsError";
   }
 }
@@ -236,45 +250,62 @@ export class RuntimeAlreadyExistsError extends Error {
 export async function createRuntime(
   runtimeData: RuntimeCreateRequest
 ): Promise<RuntimeCreateResponse> {
-  try {
-    return await makeApiCall<RuntimeCreateResponse>("/runtimes", {
-      method: "POST",
-      body: JSON.stringify(runtimeData),
-    });
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("HTTP 409")) {
-      throw new RuntimeAlreadyExistsError("Runtime already exists");
+  const response = await makeApiCall("/runtimes", {
+    method: "POST",
+    body: JSON.stringify(runtimeData),
+  });
+
+  if (response.status === 409) {
+    const errorData = (await response.json()) as any;
+    const runtimeId = errorData?.detail?.runtime_id;
+    if (runtimeId) {
+      throw new RuntimeAlreadyExistsError(runtimeId, "Runtime already exists");
     }
-    throw error;
+    throw new RuntimeAlreadyExistsError("unknown", "Runtime already exists");
   }
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+
+  return (await response.json()) as RuntimeCreateResponse;
 }
 
 export async function getRuntimeStatus(
   runtimeId: string
 ): Promise<RuntimeStatusResponse> {
-  return await makeApiCall<RuntimeStatusResponse>(`/runtimes/${runtimeId}`, {
+  const response = await makeApiCall(`/runtimes/${runtimeId}`, {
     method: "GET",
   });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+  return (await response.json()) as RuntimeStatusResponse;
 }
 
 export async function createWorkflowDeployment(
   deploymentData: WorkflowDeploymentCreateRequest
 ): Promise<WorkflowDeploymentResponse> {
-  return await makeApiCall<WorkflowDeploymentResponse>(
-    "/workflow_deployments",
-    {
-      method: "POST",
-      body: JSON.stringify(deploymentData),
-    }
-  );
+  const response = await makeApiCall("/workflow_deployments", {
+    method: "POST",
+    body: JSON.stringify(deploymentData),
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+  return (await response.json()) as WorkflowDeploymentResponse;
 }
 
 export async function listWorkflowDeployments(
   workflowId?: string
 ): Promise<WorkflowDeploymentResponse[]> {
   const queryParams = workflowId ? `?workflow_id=${workflowId}` : "";
-  const data = await makeApiCall<{ deployments: WorkflowDeploymentResponse[] }>(
-    `/workflow_deployments${queryParams}`
-  );
+  const response = await makeApiCall(`/workflow_deployments${queryParams}`);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+  const data = (await response.json()) as {
+    deployments: WorkflowDeploymentResponse[];
+  };
   return data.deployments;
 }

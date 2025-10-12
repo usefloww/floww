@@ -1,13 +1,25 @@
-import { Trigger, WebhookTrigger, CronTrigger, RealtimeTrigger, Provider } from '../../common';
-import { SecretManager } from '../secrets/secretManager';
-import { executeUserProject, getUserProject, DebugContext } from '@/codeExecution';
-import { EventStream, EventProducer } from './types';
-import { WebhookEventProducer } from './eventProducers/webhookEventProducer';
-import { CronEventProducer } from './eventProducers/cronEventProducer';
-import { WebSocketEventProducer } from './eventProducers/websocketEventProducer';
-import { ApiClient } from '../api/client';
-import { getConfig } from '../config/configUtils';
-import { tryLoadProjectConfig, ProjectConfig } from '../config/projectConfig';
+import {
+  Trigger,
+  WebhookTrigger,
+  CronTrigger,
+  RealtimeTrigger,
+  Provider,
+} from "../../common";
+import { SecretManager } from "../secrets/secretManager";
+import {
+  executeUserProject,
+  getUserProject,
+  DebugContext,
+} from "@/codeExecution";
+import { EventStream, EventProducer } from "./types";
+import { WebhookEventProducer } from "./eventProducers/webhookEventProducer";
+import { CronEventProducer } from "./eventProducers/cronEventProducer";
+import { WebSocketEventProducer } from "./eventProducers/websocketEventProducer";
+import { ApiClient } from "../api/client";
+import { getConfig } from "../config/configUtils";
+import { tryLoadProjectConfig, ProjectConfig } from "../config/projectConfig";
+import { logger } from "../utils/logger";
+import { fetchWorkflow } from "../api/apiMethods";
 
 export class FlowEngine {
   private eventStream = new EventStream();
@@ -22,7 +34,12 @@ export class FlowEngine {
   private debugMode: boolean = false;
   private debugPort: number = 9229;
 
-  constructor(private port: number, private host: string, debugMode: boolean = false, debugPort: number = 9229) {
+  constructor(
+    private port: number,
+    private host: string,
+    debugMode: boolean = false,
+    debugPort: number = 9229
+  ) {
     this.debugMode = debugMode;
     this.debugPort = debugPort;
 
@@ -35,42 +52,64 @@ export class FlowEngine {
     this.eventProducers = [
       new WebhookEventProducer(port, host),
       new CronEventProducer(),
-      new WebSocketEventProducer()
+      new WebSocketEventProducer(),
     ];
 
+    // Try to load project config
+    this.projectConfig = tryLoadProjectConfig();
+  }
+
+  private async initializeSecretManager(): Promise<void> {
     // Initialize API client and SecretManager
     const config = getConfig();
     const apiClient = new ApiClient(config.backendUrl, config.workosClientId);
 
-    // Try to load project config
-    this.projectConfig = tryLoadProjectConfig();
-
-    // Get namespace ID from project config or environment variable
+    // Get namespace ID from workflow or environment variable
     let namespaceId: string | undefined;
 
     if (this.projectConfig) {
-      namespaceId = this.projectConfig.namespaceId;
       // Only show project config in debug mode
       if (this.debugMode) {
-        console.log(`📋 Loaded project config: ${this.projectConfig.name}`);
+        logger.info(`Loaded project config: ${this.projectConfig.name}`);
         if (this.projectConfig.workflowId) {
-          console.log(`   Workflow ID: ${this.projectConfig.workflowId}`);
+          logger.plain(`   Workflow ID: ${this.projectConfig.workflowId}`);
         }
       }
-    } else {
-      // Fall back to environment variable
+
+      // If we have a workflowId, fetch the namespace from the workflow
+      if (this.projectConfig.workflowId) {
+        try {
+          const workflow = await fetchWorkflow(this.projectConfig.workflowId);
+          namespaceId = workflow.namespace_id;
+        } catch (error) {
+          // If workflow fetch fails, fall back to environment variable
+          logger.warn(
+            `Failed to fetch workflow details: ${
+              error instanceof Error ? error.message : error
+            }`
+          );
+        }
+      }
+    }
+
+    // Fall back to environment variable if no namespaceId from workflow
+    if (!namespaceId) {
       namespaceId = process.env.FLOWW_NAMESPACE_ID;
       if (namespaceId) {
-        console.log('⚠️  No floww.yaml found, using FLOWW_NAMESPACE_ID from environment');
-        console.log('   Run "floww init" to create a project config file');
+        if (!this.projectConfig) {
+          logger.warn(
+            "No floww.yaml found, using FLOWW_NAMESPACE_ID from environment"
+          );
+          logger.tip('Run "floww init" to create a project config file');
+        }
       }
     }
 
     if (!namespaceId) {
       throw new Error(
-        'No namespace ID found. Either:\n' +
-        '  1. Run "floww init" to create a floww.yaml file, or\n' +
-        '  2. Set the FLOWW_NAMESPACE_ID environment variable'
+        "No namespace ID found. Either:\n" +
+          '  1. Run "floww init" to create a floww.yaml file with a valid workflowId, or\n' +
+          "  2. Set the FLOWW_NAMESPACE_ID environment variable"
       );
     }
 
@@ -78,16 +117,18 @@ export class FlowEngine {
   }
 
   async load(filePath: string): Promise<Trigger[]> {
-    const userProject = await getUserProject(filePath, 'default');
+    const userProject = await getUserProject(filePath, "default");
     const module = await executeUserProject({
       ...userProject,
       debugMode: this.debugMode,
-      debugContext: this.debugContext
+      debugContext: this.debugContext,
     });
     const triggers = module.default;
 
     if (!Array.isArray(triggers)) {
-      throw new Error('Triggers file must export an array of triggers as default export');
+      throw new Error(
+        "Triggers file must export an array of triggers as default export"
+      );
     }
 
     this.triggers = triggers;
@@ -98,7 +139,12 @@ export class FlowEngine {
   private extractProviders(module: any): void {
     for (const key in module) {
       const value = module[key];
-      if (value && typeof value === 'object' && 'providerType' in value && 'triggers' in value) {
+      if (
+        value &&
+        typeof value === "object" &&
+        "providerType" in value &&
+        "triggers" in value
+      ) {
         this.providers.add(value as Provider);
       }
     }
@@ -106,11 +152,14 @@ export class FlowEngine {
 
   private async promptForMissingSecrets(): Promise<void> {
     for (const provider of this.providers) {
-      if (!provider.secretDefinitions || provider.secretDefinitions.length === 0) {
+      if (
+        !provider.secretDefinitions ||
+        provider.secretDefinitions.length === 0
+      ) {
         continue;
       }
 
-      const credentialName = provider.credentialName || 'default';
+      const credentialName = provider.credentialName || "default";
       const secrets = await this.secretManager.ensureProviderSecrets(
         provider.providerType,
         credentialName,
@@ -124,41 +173,59 @@ export class FlowEngine {
   }
 
   private setupEventRouting(): void {
-    this.eventStream.on('data', async (event) => {
-      const startTime = this.debugMode ? Date.now() : 0;
+    this.eventStream.on("data", async (event) => {
+      const startTime = Date.now();
 
-      if (this.debugMode && this.debugContext) {
-        console.log(`🔄 Processing ${event.type} event`);
+      // Enhanced request logging with better details
+      let eventDescription = "";
+      if (event.type === "webhook") {
+        const method = event.data?.method || "POST";
+        const path = event.data?.path || "/webhook";
+        eventDescription = `${method} ${path}`;
+      } else if (event.type === "cron") {
+        eventDescription = event.data?.expression || "scheduled";
+      } else if (event.type === "realtime") {
+        eventDescription = `channel: ${event.data?.channel || "unknown"}`;
+      } else {
+        eventDescription = event.type;
       }
+
+      logger.info(`Incoming ${event.type} request: ${eventDescription}`);
 
       try {
         if (event.trigger) {
           // Direct trigger provided (webhook/cron)
           await event.trigger.handler({}, event.data);
-        } else if (event.type === 'realtime') {
+        } else if (event.type === "realtime") {
           // Find matching realtime triggers
-          const realtimeTriggers = this.triggers.filter(t => t.type === 'realtime') as RealtimeTrigger[];
+          const realtimeTriggers = this.triggers.filter(
+            (t) => t.type === "realtime"
+          ) as RealtimeTrigger[];
           for (const trigger of realtimeTriggers) {
-            if (trigger.channel === event.data.channel &&
-                (!trigger.messageType || trigger.messageType === event.data.type)) {
+            if (
+              trigger.channel === event.data.channel &&
+              (!trigger.messageType || trigger.messageType === event.data.type)
+            ) {
               await trigger.handler({}, event.data);
             }
           }
         }
 
-        if (this.debugMode && this.debugContext) {
-          const executionTime = Date.now() - startTime;
-          console.log(`✅ ${event.type} event completed in ${executionTime}ms`);
-        }
+        const executionTime = Date.now() - startTime;
+        logger.success(`${event.type} request completed in ${executionTime}ms`);
       } catch (error) {
+        const executionTime = Date.now() - startTime;
         if (this.debugContext) {
           this.debugContext.reportError(error, {
             eventType: event.type,
             eventData: event.data,
-            triggerType: event.trigger?.type || 'unknown'
+            triggerType: event.trigger?.type || "unknown",
           });
         } else {
-          console.error(`Error in ${event.type} handler:`, error);
+          logger.error(
+            `${event.type} request failed after ${executionTime}ms:`,
+            error
+          );
         }
       }
     });
@@ -172,19 +239,30 @@ export class FlowEngine {
 
     // Log triggers
     for (const trigger of this.triggers) {
-      if (trigger.type === 'webhook') {
-        console.log(`📌 Webhook: ${(trigger as WebhookTrigger).method || 'POST'} ${(trigger as WebhookTrigger).path || '/webhook'}`);
-      } else if (trigger.type === 'cron') {
-        console.log(`⏰ Cron: ${(trigger as CronTrigger).expression}`);
-      } else if (trigger.type === 'realtime') {
-        console.log(`📡 Realtime: ${(trigger as RealtimeTrigger).channel}`);
+      if (trigger.type === "webhook") {
+        logger.plain(
+          `📌 Webhook: ${(trigger as WebhookTrigger).method || "POST"} ${
+            (trigger as WebhookTrigger).path || "/webhook"
+          }`
+        );
+      } else if (trigger.type === "cron") {
+        logger.plain(`⏰ Cron: ${(trigger as CronTrigger).expression}`);
+      } else if (trigger.type === "realtime") {
+        logger.plain(`📡 Realtime: ${(trigger as RealtimeTrigger).channel}`);
       }
     }
   }
 
   async start() {
+    // Initialize secret manager first
+    await this.initializeSecretManager();
+
     // Combine starting and loaded info into one line
-    console.log(`🚀 Flow Engine running with ${this.triggers.length} trigger(s)${this.debugMode ? ` (debugging on port ${this.debugPort})` : ''}`);
+    logger.success(
+      `Flow Engine running with ${this.triggers.length} trigger(s)${
+        this.debugMode ? ` (debugging on port ${this.debugPort})` : ""
+      }`
+    );
 
     // Remove verbose debug feature list - users know they enabled debug mode
 
@@ -195,8 +273,8 @@ export class FlowEngine {
       try {
         await this.debugContext.startInspector();
       } catch (error) {
-        console.warn('⚠️  Failed to start inspector:', error);
-        console.log('   Continuing without inspector integration');
+        logger.warn("Failed to start inspector:", error);
+        logger.plain("   Continuing without inspector integration");
       }
     }
 
@@ -207,14 +285,14 @@ export class FlowEngine {
   }
 
   async stop() {
-    console.log('\n🛑 Stopping Flow Engine...');
+    logger.info("Stopping Flow Engine...");
 
     // Stop inspector if running
     if (this.debugContext) {
       try {
         await this.debugContext.stopInspector();
       } catch (error) {
-        console.warn('⚠️  Error stopping inspector:', error);
+        logger.warn("Error stopping inspector:", error);
       }
     }
 
@@ -223,15 +301,13 @@ export class FlowEngine {
     }
 
     this.eventStream.removeAllListeners();
-    console.log('\n👋 Flow Engine stopped');
+    logger.success("Flow Engine stopped");
   }
 
   async reload(filePath: string) {
-    console.log('\n🔄 Reloading triggers...');
-
     await this.load(filePath);
     await this.updateProducers();
 
-    console.log(`\n✅ Triggers reloaded successfully`);
+    logger.success("Triggers reloaded successfully");
   }
 }

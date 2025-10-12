@@ -12,6 +12,7 @@ import {
   createWorkflowDeployment,
   readProjectFiles,
   fetchWorkflows,
+  fetchWorkflow,
   getPushData,
   PushTokenResponse,
   RuntimeAlreadyExistsError,
@@ -24,6 +25,8 @@ import {
   dockerPushImage,
   dockerGetImageHash,
 } from "../utils/dockerUtils";
+import { logger, ICONS } from "../utils/logger";
+import { selectOrCreateWorkflow } from "../utils/promptUtils";
 
 const defaultDockerfileContent = `
 FROM base-floww
@@ -43,90 +46,77 @@ function ensureDockerfile(projectDir: string, projectConfig: any): string {
   const dockerfilePath = path.join(projectDir, "Dockerfile");
 
   if (!fs.existsSync(dockerfilePath)) {
-    console.log("📄 No Dockerfile found, creating default...");
+    logger.info("No Dockerfile found, creating default...");
     const entrypoint = projectConfig.entrypoint || "main.ts";
     const dockerfileContent = defaultDockerfileContent.replace(
       "ENV FLOWW_ENTRYPOINT=main.ts",
       `ENV FLOWW_ENTRYPOINT=${entrypoint}`
     );
     fs.writeFileSync(dockerfilePath, dockerfileContent.trim());
-    console.log("✅ Created default Dockerfile");
+    logger.success("Created default Dockerfile");
   }
 
   return dockerfilePath;
 }
 
 async function pollRuntimeUntilReady(runtimeId: string): Promise<void> {
-  console.log("⏳ Waiting for runtime to be ready...");
+  await logger.task("Preparing runtime", async () => {
+    while (true) {
+      try {
+        const status = await getRuntimeStatus(runtimeId);
 
-  let lastLogCount = 0;
-
-  while (true) {
-    try {
-      const status = await getRuntimeStatus(runtimeId);
-
-      // Display new logs if any
-      if (status.creation_logs && status.creation_logs.length > lastLogCount) {
-        const newLogs = status.creation_logs.slice(lastLogCount);
-        for (const log of newLogs) {
-          const timestamp = new Date(log.timestamp).toLocaleTimeString();
-          const level = log.level || "info";
-          const levelIcon =
-            level === "error" ? "❌" : level === "warning" ? "⚠️" : "ℹ️";
-          console.log(`   ${levelIcon} [${timestamp}] ${log.message}`);
+        // Check final status
+        if (status.creation_status === "completed") {
+          return;
+        } else if (status.creation_status === "failed") {
+          throw new Error("Runtime creation failed");
         }
-        lastLogCount = status.creation_logs.length;
-      }
 
-      // Check final status
-      if (status.creation_status === "completed") {
-        console.log("✅ Runtime is ready!");
-        return;
-      } else if (status.creation_status === "failed") {
-        console.error("❌ Runtime creation failed");
-        process.exit(1);
+        // Wait 5 seconds before next poll
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      } catch (error) {
+        throw error;
       }
-
-      // Wait 5 seconds before next poll
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    } catch (error) {
-      console.error(
-        "❌ Failed to check runtime status:",
-        error instanceof Error ? error.message : error
-      );
-      process.exit(1);
     }
-  }
+  });
 }
 
 async function selectWorkflow(): Promise<string> {
   const workflows = await fetchWorkflows();
 
   if (workflows.length === 0) {
-    console.error(
-      "❌ No workflows found. Create one first in the Floww dashboard."
+    logger.error(
+      "No workflows found. Create one first in the Floww dashboard."
     );
     process.exit(1);
   }
 
-  console.log("\n📋 Select a workflow to deploy to:");
-  workflows.forEach((workflow, index) => {
-    console.log(
-      `  ${index + 1}. ${workflow.name}${
-        workflow.namespace_name ? ` (${workflow.namespace_name})` : ""
-      }${workflow.description ? ` - ${workflow.description}` : ""}`
+  // Use interactive selection with clack in interactive mode
+  if (logger.interactive) {
+    const options = workflows.map((workflow) => ({
+      value: workflow.id,
+      label: workflow.name,
+      hint: workflow.namespace_name
+        ? `${workflow.namespace_name}${
+            workflow.description ? ` - ${workflow.description}` : ""
+          }`
+        : workflow.description,
+    }));
+
+    const selectedId = await logger.select(
+      "Select a workflow to deploy to:",
+      options
     );
-  });
-
-  // For now, return the first workflow as default
-  // TODO: Implement proper interactive selection
-  const selectedWorkflow = workflows[0];
-  console.log(`\n✅ Selected: ${selectedWorkflow.name}`);
-  console.log(
-    '💡 Tip: Run "floww init" to set a default workflow for this project'
-  );
-
-  return selectedWorkflow.id;
+    const selectedWorkflow = workflows.find((w) => w.id === selectedId)!;
+    logger.success(`Selected: ${selectedWorkflow.name}`);
+    return selectedId;
+  } else {
+    // Non-interactive mode: return first workflow
+    const selectedWorkflow = workflows[0];
+    logger.info(`Auto-selected workflow: ${selectedWorkflow.name}`);
+    logger.tip('Run "floww init" to set a default workflow for this project');
+    return selectedWorkflow.id;
+  }
 }
 
 /**
@@ -150,16 +140,16 @@ export async function deployCommand() {
 
   // Auto-initialize if no config exists
   if (!hasProjectConfig()) {
-    console.log(
-      "🚀 No project configuration found. Let's set up your project first!\n"
+    logger.info(
+      "No project configuration found. Let's set up your project first!"
     );
 
     try {
       await initCommand({ silent: false });
-      console.log("\n🚀 Continuing with deployment...\n");
+      logger.info("Continuing with deployment...");
     } catch (error) {
-      console.error(
-        "❌ Initialization failed:",
+      logger.error(
+        "Initialization failed:",
         error instanceof Error ? error.message : error
       );
       process.exit(1);
@@ -168,32 +158,74 @@ export async function deployCommand() {
 
   // Load project config
   let projectConfig = loadProjectConfig();
-  console.log(`🚀 Deploying project: ${projectConfig.name}`);
 
   // Handle workflow selection if workflowId is missing (fallback)
   if (!projectConfig.workflowId) {
-    console.log("📋 No workflowId specified, selecting workflow...");
+    logger.info("No workflowId specified, selecting workflow...");
 
     try {
       const selectedWorkflowId = await selectWorkflow();
 
       // Update floww.yaml with selected workflow
       projectConfig = updateProjectConfig({ workflowId: selectedWorkflowId });
-      console.log("✅ Workflow saved to floww.yaml");
+      logger.success("Workflow saved to floww.yaml");
     } catch (error) {
-      console.error(
-        "❌ Workflow selection failed:",
+      logger.error(
+        "Workflow selection failed:",
         error instanceof Error ? error.message : error
       );
       process.exit(1);
     }
   }
 
-  // 1. Ensure Dockerfile exists
+  // 1. Verify workflow exists
+  let workflow;
+  try {
+    workflow = await fetchWorkflow(projectConfig.workflowId!);
+  } catch (error) {
+    // Check if it's a 404 (workflow not found) and we're in interactive mode
+    const is404 = error instanceof Error && error.message.includes("404");
+
+    if (is404 && logger.interactive) {
+      logger.warn(`Workflow not found. Let's select or create a workflow.`);
+
+      try {
+        const { workflowId, workflow: selectedWorkflow } =
+          await selectOrCreateWorkflow({
+            suggestedName: projectConfig.name,
+            allowCreate: true,
+          });
+
+        // Update project config with the selected workflow
+        projectConfig = updateProjectConfig({ workflowId });
+        workflow = selectedWorkflow;
+      } catch (selectionError) {
+        logger.error(
+          "Failed to select workflow:",
+          selectionError instanceof Error
+            ? selectionError.message
+            : selectionError
+        );
+        process.exit(1);
+      }
+    } else {
+      logger.error(
+        "Workflow not found or inaccessible:",
+        error instanceof Error ? error.message : error
+      );
+      logger.tip('Run "floww init" to select a different workflow');
+      process.exit(1);
+    }
+  }
+
+  // 2. Ensure Dockerfile exists
   ensureDockerfile(projectDir, projectConfig);
 
-  // 2. Build Docker image
-  const buildResult = dockerBuildImage(projectConfig, projectDir);
+  // 3. Build Docker image
+  const buildResult = await logger.task("Building Docker image", async () => {
+    return dockerBuildImage(projectConfig, projectDir);
+  });
+
   const imageHash = dockerGetImageHash({ localImage: buildResult.localImage });
 
   let shouldPush = true;
@@ -203,11 +235,10 @@ export async function deployCommand() {
     pushData = await getPushData(imageHash);
   } catch (error) {
     if (error instanceof ImageAlreadyExistsError) {
-      console.log("♻️ Image already exists in registry, skipping push...");
       shouldPush = false;
     } else {
-      console.error(
-        "❌ Failed to get push token:",
+      logger.error(
+        "Failed to get push data:",
         error instanceof Error ? error.message : error
       );
       process.exit(1);
@@ -216,60 +247,56 @@ export async function deployCommand() {
 
   // 4. Push images to registry (only if needed)
   if (shouldPush) {
-    const imageUri = `${pushData.registry_url}:${imageHash}`;
-    dockerRetagImage({ currentTag: buildResult.localImage, newTag: imageUri });
-    dockerLogin({
-      registryUrl: pushData.registry_url,
-      token: pushData.password,
+    await logger.task("Pushing image", async () => {
+      const imageUri = `${pushData.registry_url}:${imageHash}`;
+      dockerRetagImage({
+        currentTag: buildResult.localImage,
+        newTag: imageUri,
+      });
+      dockerLogin({
+        registryUrl: pushData.registry_url,
+        token: pushData.password,
+      });
+      dockerPushImage({ imageUri: imageUri });
     });
-    dockerPushImage({ imageUri: imageUri });
   }
 
   // 5. Create runtime
-  console.log("🔧 Creating runtime...");
-  console.log(buildResult);
-  try {
-    const runtimeResult = await createRuntime({
-      config: {
-        image_hash: imageHash,
-      },
-    });
-  } catch (error) {
-    if (error instanceof RuntimeAlreadyExistsError) {
-      console.log("♻️ Runtime already exists");
-    } else {
-      console.error(
-        "❌ Failed to create runtime:",
-        error instanceof Error ? error.message : error
-      );
-      process.exit(1);
+
+  const runtimeResult = await logger.task("Creating runtime", async () => {
+    try {
+      return await createRuntime({
+        config: {
+          image_hash: imageHash,
+        },
+      });
+    } catch (error) {
+      if (error instanceof RuntimeAlreadyExistsError) {
+        // Fetch the existing runtime status
+        return await getRuntimeStatus(error.runtimeId);
+      } else {
+        logger.error(
+          "Failed to create runtime:",
+          error instanceof Error ? error.message : error
+        );
+        process.exit(1);
+      }
     }
-  }
-
-  console.log("✅ Runtime creation started!");
-  console.log(`   Runtime ID: ${runtimeResult.id}`);
-  console.log(`   Status: ${runtimeResult.creation_status}`);
-
+  });
   // 6. Poll runtime status until completion
   await pollRuntimeUntilReady(runtimeResult.id);
 
   // 7. Read project files and create workflow deployment
   const entrypoint = projectConfig.entrypoint || "main.ts";
-  console.log(`📝 Reading project code with entrypoint: ${entrypoint}`);
-
   const userCode = await readProjectFiles(projectDir, entrypoint);
 
-  console.log("🚀 Creating workflow deployment...");
-  const deploymentResult = await createWorkflowDeployment({
-    workflow_id: projectConfig.workflowId!,
-    runtime_id: runtimeResult.id,
-    code: userCode,
+  await logger.task("Deploying", async () => {
+    return await createWorkflowDeployment({
+      workflow_id: projectConfig.workflowId!,
+      runtime_id: runtimeResult.id,
+      code: userCode,
+    });
   });
 
-  console.log("✅ Workflow deployment created successfully!");
-  console.log(`   Deployment ID: ${deploymentResult.id}`);
-  console.log(`   Status: ${deploymentResult.status}`);
-  console.log(`   Deployed At: ${deploymentResult.deployed_at}`);
-
-  console.log("\n🎉 Deploy completed successfully!");
+  logger.success("Deploy completed successfully!");
 }

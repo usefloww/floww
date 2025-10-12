@@ -52,6 +52,8 @@
   "packageManager": "pnpm@10.9.0",
   "dependencies": {
     "@DeveloperFlows/floww-sdk": "link:",
+    "@clack/core": "^0.5.0",
+    "@clack/prompts": "^0.11.0",
     "@pulumi/gitlab": "^9.2.1",
     "@pulumi/pulumi": "^3.196.0",
     "@types/inquirer": "^9.0.9",
@@ -61,6 +63,7 @@
     "chokidar": "^4.0.3",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.1",
+    "consola": "^3.4.2",
     "fastify": "^5.6.1",
     "ink": "^6.3.1",
     "inquirer": "^12.9.6",

@@ -3,7 +3,6 @@ import path from 'path';
 import yaml from 'js-yaml';
 
 export interface ProjectConfig {
-  namespaceId: string;
   workflowId?: string;
   name: string;
   description?: string;
@@ -46,9 +45,6 @@ export function loadProjectConfig(dir: string = process.cwd()): ProjectConfig {
     const config = yaml.load(content) as ProjectConfig;
 
     // Validate required fields
-    if (!config.namespaceId) {
-      throw new Error('floww.yaml is missing required field: namespaceId');
-    }
     if (!config.name) {
       throw new Error('floww.yaml is missing required field: name');
     }
@@ -83,9 +79,6 @@ export function saveProjectConfig(
   const configPath = getProjectConfigPath(dir);
 
   // Validate required fields before saving
-  if (!config.namespaceId) {
-    throw new Error('Cannot save config: namespaceId is required');
-  }
   if (!config.name) {
     throw new Error('Cannot save config: name is required');
   }

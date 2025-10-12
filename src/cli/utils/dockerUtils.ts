@@ -1,4 +1,5 @@
 import { execSync } from "child_process";
+import { logger, ICONS } from "./logger";
 
 export interface DockerBuildResult {
   localImage: string;
@@ -12,49 +13,52 @@ export function dockerBuildImage(
   projectConfig: any,
   projectDir: string
 ): DockerBuildResult {
-  const namespaceId = projectConfig.namespaceId;
   const workloadId = projectConfig.workflowId || "unknown";
-  const localImage = `floww:${namespaceId}-${workloadId}`;
-
-  console.log(`=3 Building Docker image: ${localImage}`);
+  const localImage = `floww:${workloadId}`;
 
   try {
     // Build the image with multiple tags
     execSync(`docker build --provenance=false -t "${localImage}" .`, {
       cwd: projectDir,
-      stdio: "inherit",
+      stdio: logger.interactive ? "pipe" : "inherit", // Hide output in interactive mode
     });
 
     return {
       localImage,
     };
   } catch (error) {
-    console.error("L Docker build failed:", error);
+    logger.error("Docker build failed:", error);
     process.exit(1);
   }
 }
 
 export function dockerLogin(args: { registryUrl: string; token: string }) {
-  execSync(
-    `echo "${args.token}" | docker login ${args.registryUrl} -u token --password-stdin`,
-    {
-      stdio: ["pipe", "inherit", "inherit"],
-    }
-  );
+  logger.info(`Logging in to registry: ${args.registryUrl}`);
+  try {
+    execSync(
+      `echo "${args.token}" | docker login ${args.registryUrl} -u token --password-stdin`,
+      {
+        stdio: ["pipe", logger.interactive ? "pipe" : "inherit", "inherit"],
+      }
+    );
+  } catch (error) {
+    logger.error("Docker registry login failed:", error);
+    process.exit(1);
+  }
 }
 
 export function dockerPushImage(args: { imageUri: string }): void {
   try {
-    console.log("=� Pushing images...");
+    logger.info(`Pushing image: ${args.imageUri}`);
 
     // Push both tags
     execSync(`docker push "${args.imageUri}"`, {
-      stdio: "inherit",
+      stdio: logger.interactive ? "pipe" : "inherit",
     });
 
-    console.log(" Images pushed successfully!");
+    logger.success("Image pushed successfully!");
   } catch (error) {
-    console.error("L Docker push failed:", error);
+    logger.error("Docker push failed:", error);
     process.exit(1);
   }
 }
