@@ -53,10 +53,26 @@ export interface WorkflowDeploymentUserCode {
   entrypoint: string;
 }
 
+export interface TriggerMetadata {
+  type: string;
+  path?: string;
+  method?: string;
+  expression?: string;
+  channel?: string;
+}
+
+export interface WebhookInfo {
+  id: string;
+  url: string;
+  path?: string;
+  method?: string;
+}
+
 export interface WorkflowDeploymentCreateRequest {
   workflow_id: string;
   runtime_id: string;
   code: WorkflowDeploymentUserCode;
+  triggers?: TriggerMetadata[];
 }
 
 export interface WorkflowDeploymentResponse {
@@ -70,6 +86,7 @@ export interface WorkflowDeploymentResponse {
   deployed_at: string;
   note?: string;
   user_code?: WorkflowDeploymentUserCode;
+  webhooks?: WebhookInfo[];
 }
 
 export interface PushTokenRequest {

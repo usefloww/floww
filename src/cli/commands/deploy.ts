@@ -298,15 +298,64 @@ export async function deployCommand() {
     }
   });
 
-  // 7. Read project files and create workflow deployment
+  // 7. Read project files and parse triggers
   const userCode = await readProjectFiles(projectDir, entrypoint);
 
-  await logger.task("Deploying workflow", async () => {
-    return "Deployed workflow";
-    await createWorkflowDeployment({
+  // Parse triggers to extract metadata
+  const { executeUserProject } = await import("@/codeExecution");
+
+  const triggersMetadata = await logger.task("Extracting trigger metadata", async () => {
+    try {
+      // Use the files we already read
+      const entryPointName = entrypoint.replace(/\.ts$/, '') + '.default';
+      const module = await executeUserProject({
+        files: userCode.files,
+        entryPoint: entryPointName,
+      });
+      const triggers = module.default;
+
+      if (!Array.isArray(triggers)) {
+        throw new Error("Triggers file must export an array of triggers");
+      }
+
+      // Extract metadata from triggers
+      return triggers.map((trigger: any) => {
+        const metadata: any = { type: trigger.type };
+
+        if (trigger.type === "webhook") {
+          metadata.path = trigger.path || "/webhook";
+          metadata.method = trigger.method || "POST";
+        } else if (trigger.type === "cron") {
+          metadata.expression = trigger.expression;
+        } else if (trigger.type === "realtime") {
+          metadata.channel = trigger.channel;
+        }
+
+        return metadata;
+      });
+    } catch (error) {
+      logger.warn("Failed to extract trigger metadata:", error instanceof Error ? error.message : error);
+      return [];
+    }
+  });
+
+  // 8. Create workflow deployment with triggers metadata
+  const deployment = await logger.task("Deploying workflow", async () => {
+    return await createWorkflowDeployment({
       workflow_id: projectConfig.workflowId!,
       runtime_id: runtimeResult.id,
       code: userCode,
+      triggers: triggersMetadata,
     });
   });
+
+  // Display webhook URLs if available
+  if (deployment.webhooks && deployment.webhooks.length > 0) {
+    logger.success("\nWebhook URLs:");
+    for (const webhook of deployment.webhooks) {
+      const pathInfo = webhook.path ? ` ${webhook.method || "POST"} ${webhook.path}` : "";
+      logger.plain(`  📌${pathInfo}`);
+      logger.plain(`     → ${webhook.url}`);
+    }
+  }
 }
