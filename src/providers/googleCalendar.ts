@@ -70,7 +70,7 @@ export class GoogleCalendar extends BaseProvider {
             return {
                 type: 'webhook',
                 handler: args.handler,
-                path: '/webhooks/google-calendar/event-create',
+                // Path will be auto-generated as /webhook/{uuid}
                 method: 'POST',
                 setup: async (ctx) => {
                     // TODO: Register webhook with Google Calendar API

@@ -75,7 +75,7 @@ export class Gitlab extends BaseProvider {
             return {
                 type: 'webhook',
                 handler: args.handler,
-                path: '/webhooks/gitlab/merge-request-comment',
+                // Path will be auto-generated as /webhook/{uuid}
                 method: 'POST',
                 validation: async (event) => {
                     // TODO: Implement GitLab webhook signature validation

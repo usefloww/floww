@@ -241,8 +241,8 @@ export class FlowEngine {
     for (const trigger of this.triggers) {
       if (trigger.type === "webhook") {
         logger.plain(
-          `📌 Webhook: ${(trigger as WebhookTrigger).method || "POST"} /webhooks${
-            (trigger as WebhookTrigger).path || "/webhook"
+          `📌 Webhook: ${(trigger as WebhookTrigger).method || "POST"} /webhook${
+            (trigger as WebhookTrigger).path || ""
           }`
         );
       } else if (trigger.type === "cron") {

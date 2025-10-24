@@ -30,8 +30,8 @@ export class WebhookEventProducer implements EventProducer {
         }
       });
 
-      this.app.all('/webhooks/*', async (request, reply) => {
-        const path = request.url.replace('/webhooks', '');
+      this.app.all('/webhook/*', async (request, reply) => {
+        const path = request.url.replace('/webhook', '');
         const trigger = this.webhooks.get(path);
 
         if (!trigger) {

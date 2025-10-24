@@ -323,7 +323,11 @@ export async function deployCommand() {
         const metadata: any = { type: trigger.type };
 
         if (trigger.type === "webhook") {
-          metadata.path = trigger.path || "/webhook";
+          // Only include path if explicitly set by user
+          // Provider webhooks (without path) will get auto-generated UUID paths
+          if (trigger.path) {
+            metadata.path = trigger.path;
+          }
           metadata.method = trigger.method || "POST";
         } else if (trigger.type === "cron") {
           metadata.expression = trigger.expression;
