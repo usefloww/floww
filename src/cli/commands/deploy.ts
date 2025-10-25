@@ -233,7 +233,7 @@ export async function deployCommand() {
   ensureDockerfile(projectDir, projectConfig);
 
   // 3.5. Pre-build SDK if in monorepo (for faster Docker builds)
-  const isInSdkExamples = projectDir.includes('/sdk/examples/');
+  const isInSdkExamples = projectDir.includes('/examples/');
   if (isInSdkExamples) {
     await logger.task("Pre-building SDK", async () => {
       const { execSync } = await import("child_process");

@@ -19,7 +19,7 @@ export function dockerBuildImage(
   try {
     // Build the image for x86_64 (Lambda architecture)
     // Check if we're in SDK examples (monorepo) - use parent context to access SDK source
-    const isInSdkExamples = projectDir.includes('/sdk/examples/');
+    const isInSdkExamples = projectDir.includes('/examples/');
 
     let buildCmd: string;
     let buildCwd: string;

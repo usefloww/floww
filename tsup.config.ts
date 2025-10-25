@@ -31,7 +31,6 @@ export default defineConfig([
       'open',
       'inquirer',
       'react',
-      'ink',
     ],
     noExternal: [],
   },

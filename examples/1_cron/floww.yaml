@@ -1,4 +1,4 @@
-workflowId: 69c0a473-ec9d-4727-b597-c4c79f4356ed
+workflowId: b19f3998-3e7b-445c-8c2e-2873b7c93ce2
 name: Test Cron
 version: 1.0.0
 entrypoint: main.ts
