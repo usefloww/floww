@@ -38,6 +38,7 @@ export class FlowEngine {
   private debugContext?: DebugContext;
   private debugMode: boolean = false;
   private debugPort: number = 9229;
+  private needsSeparator: boolean = false;
 
   constructor(
     private port: number,
@@ -131,11 +132,15 @@ export class FlowEngine {
       : [originalEntryPoint, "default"];
 
     const wrapperCode = `
+      // Import auto-registration functions first
+      const { getUsedProviders, getRegisteredTriggers, clearRegisteredTriggers, clearUsedProviders } = require('@developerflows/floww-sdk');
+
+      // Clear previously registered data to prevent duplication on reload
+      clearRegisteredTriggers();
+      clearUsedProviders();
+
       // Import the original user module to trigger auto-registration
       const originalModule = require('./${fileAndExport.replace(".ts", "")}');
-
-      // Import auto-registration functions
-      const { getUsedProviders, getRegisteredTriggers } = require('@developerflows/floww-sdk');
 
       // Capture auto-registered data
       const usedProviders = getUsedProviders();
@@ -183,10 +188,9 @@ export class FlowEngine {
 
     return {
       triggers,
-      providers
+      providers,
     };
   }
-
 
   private async promptForMissingSecrets(): Promise<void> {
     for (const provider of this.providers) {
@@ -214,21 +218,24 @@ export class FlowEngine {
     this.eventStream.on("data", async (event) => {
       const startTime = Date.now();
 
-      // Enhanced request logging with better details
-      let eventDescription = "";
+      // Add separator line above execution if needed
+      if (this.needsSeparator) {
+        console.log();
+      }
+
+      // Create a compact, structured log entry
+      let eventInfo = "";
       if (event.type === "webhook") {
         const method = event.data?.method || "POST";
         const path = event.data?.path || "/webhook";
-        eventDescription = `${method} ${path}`;
+        eventInfo = `${method} ${path}`;
       } else if (event.type === "cron") {
-        eventDescription = event.data?.expression || "scheduled";
+        eventInfo = event.data?.expression || "scheduled";
       } else if (event.type === "realtime") {
-        eventDescription = `channel: ${event.data?.channel || "unknown"}`;
+        eventInfo = `${event.data?.channel || "unknown"}`;
       } else {
-        eventDescription = event.type;
+        eventInfo = event.type;
       }
-
-      logger.info(`Incoming ${event.type} request: ${eventDescription}`);
 
       try {
         if (event.trigger) {
@@ -250,9 +257,22 @@ export class FlowEngine {
         }
 
         const executionTime = Date.now() - startTime;
-        logger.success(`${event.type} request completed in ${executionTime}ms`);
+
+        // Single success log with all info
+        logger.console.success(
+          `${event.type} ${eventInfo} → completed in ${executionTime}ms`
+        );
+
+        // Set flag to add separator before next execution
+        this.needsSeparator = true;
       } catch (error) {
         const executionTime = Date.now() - startTime;
+
+        // Single error log with all info
+        logger.console.error(
+          `${event.type} ${eventInfo} → failed after ${executionTime}ms`
+        );
+
         if (this.debugContext) {
           this.debugContext.reportError(error, {
             eventType: event.type,
@@ -260,11 +280,11 @@ export class FlowEngine {
             triggerType: event.trigger?.type || "unknown",
           });
         } else {
-          logger.error(
-            `${event.type} request failed after ${executionTime}ms:`,
-            error
-          );
+          logger.debugInfo(`Error details:`, error);
         }
+
+        // Set flag to add separator before next execution
+        this.needsSeparator = true;
       }
     });
   }
@@ -275,18 +295,25 @@ export class FlowEngine {
       await producer.updateTriggers(this.triggers, this.eventStream);
     }
 
-    // Log triggers
-    for (const trigger of this.triggers) {
-      if (trigger.type === "webhook") {
-        logger.plain(
-          `📌 Webhook: ${
-            (trigger as WebhookTrigger).method || "POST"
-          } /webhook${(trigger as WebhookTrigger).path || ""}`
-        );
-      } else if (trigger.type === "cron") {
-        logger.plain(`⏰ Cron: ${(trigger as CronTrigger).expression}`);
-      } else if (trigger.type === "realtime") {
-        logger.plain(`📡 Realtime: ${(trigger as RealtimeTrigger).channel}`);
+    // Log triggers in debug mode only
+    if (this.debugMode) {
+      logger.debugInfo("Registered triggers:");
+      for (const trigger of this.triggers) {
+        if (trigger.type === "webhook") {
+          logger.console.debug(
+            `  📌 Webhook: ${
+              (trigger as WebhookTrigger).method || "POST"
+            } /webhook${(trigger as WebhookTrigger).path || ""}`
+          );
+        } else if (trigger.type === "cron") {
+          logger.console.debug(
+            `  ⏰ Cron: ${(trigger as CronTrigger).expression}`
+          );
+        } else if (trigger.type === "realtime") {
+          logger.console.debug(
+            `  📡 Realtime: ${(trigger as RealtimeTrigger).channel}`
+          );
+        }
       }
     }
   }
@@ -295,9 +322,9 @@ export class FlowEngine {
     // Initialize secret manager first
     await this.initializeSecretManager();
 
-    // Combine starting and loaded info into one line
-    logger.success(
-      `Flow Engine running with ${this.triggers.length} trigger(s)${
+    // Clean startup message
+    console.log(
+      `✅ Flow Engine running with ${this.triggers.length} trigger(s)${
         this.debugMode ? ` (debugging on port ${this.debugPort})` : ""
       }`
     );
@@ -319,18 +346,20 @@ export class FlowEngine {
     this.setupEventRouting();
     await this.updateProducers();
 
-    // No need for additional "running" message since we already said it's running above
+    // Set separator flag so first execution gets visual separation from startup
+    this.needsSeparator = true;
   }
 
   async stop() {
-    logger.info("Stopping Flow Engine...");
+    console.log(); // Add line above for visual separation
+    console.log("🛑 Stopping Flow Engine...");
 
     // Stop inspector if running
     if (this.debugContext) {
       try {
         await this.debugContext.stopInspector();
       } catch (error) {
-        logger.warn("Error stopping inspector:", error);
+        logger.debugInfo("Error stopping inspector:", error);
       }
     }
 
@@ -339,13 +368,16 @@ export class FlowEngine {
     }
 
     this.eventStream.removeAllListeners();
-    logger.success("Flow Engine stopped");
+    console.log("✨ Flow Engine stopped. See you next time! 👋");
   }
 
   async reload(filePath: string) {
     await this.load(filePath);
     await this.updateProducers();
 
-    logger.success("Triggers reloaded successfully");
+    // Set separator flag so next execution gets visual separation from reload messages
+    this.needsSeparator = true;
+
+    logger.debugInfo("Triggers reloaded successfully");
   }
 }

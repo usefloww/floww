@@ -1,25 +1,28 @@
-import { execSync } from "child_process";
+import { execa } from "execa";
 import { logger, ICONS } from "./logger";
 
 export interface DockerBuildResult {
   localImage: string;
 }
 
-export function dockerRetagImage(args: { currentTag: string; newTag: string }) {
-  execSync(`docker tag "${args.currentTag}" "${args.newTag}"`);
+export async function dockerRetagImage(args: {
+  currentTag: string;
+  newTag: string;
+}) {
+  await execa("docker", ["tag", args.currentTag, args.newTag]);
 }
 
-export function dockerBuildImage(
+export async function dockerBuildImage(
   projectConfig: any,
   projectDir: string
-): DockerBuildResult {
+): Promise<DockerBuildResult> {
   const workloadId = projectConfig.workflowId || "unknown";
   const localImage = `floww:${workloadId}`;
 
   try {
     // Build the image for x86_64 (Lambda architecture)
     // Check if we're in SDK examples (monorepo) - use parent context to access SDK source
-    const isInSdkExamples = projectDir.includes('/examples/');
+    const isInSdkExamples = projectDir.includes("/examples/");
 
     let buildCmd: string;
     let buildCwd: string;
@@ -34,10 +37,21 @@ export function dockerBuildImage(
       buildCwd = projectDir;
     }
 
-    execSync(buildCmd, {
+    // Run Docker build asynchronously and stream output
+    const subprocess = execa(buildCmd, {
       cwd: buildCwd,
-      stdio: logger.interactive ? "pipe" : "inherit", // Hide output in interactive mode
+      shell: true,
+      all: true,
     });
+
+    for await (const chunk of subprocess.all!) {
+      const line = chunk.toString();
+      // optionally print debug info
+      if (logger.debug) logger.debugInfo(line.trim());
+      await new Promise((r) => setTimeout(r, 0)); // yield to event loop
+    }
+
+    await subprocess; // wait for process to finish
 
     return {
       localImage,
@@ -48,13 +62,20 @@ export function dockerBuildImage(
   }
 }
 
-export function dockerLogin(args: { registryUrl: string; token: string }) {
-  logger.info(`Logging in to registry: ${args.registryUrl}`);
+export async function dockerLogin(args: {
+  registryUrl: string;
+  token: string;
+}) {
+  logger.debugInfo(`Logging in to registry: ${args.registryUrl}`);
   try {
-    execSync(
-      `echo "${args.token}" | docker login ${args.registryUrl} -u token --password-stdin`,
+    await execa(
+      "bash",
+      [
+        "-c",
+        `echo "${args.token}" | docker login ${args.registryUrl} -u token --password-stdin`,
+      ],
       {
-        stdio: ["pipe", logger.interactive ? "pipe" : "inherit", "inherit"],
+        all: true,
       }
     );
   } catch (error) {
@@ -63,29 +84,40 @@ export function dockerLogin(args: { registryUrl: string; token: string }) {
   }
 }
 
-export function dockerPushImage(args: { imageUri: string }): void {
+export async function dockerPushImage(args: {
+  imageUri: string;
+}): Promise<void> {
   try {
-    logger.info(`Pushing image: ${args.imageUri}`);
+    logger.debugInfo(`Pushing image: ${args.imageUri}`);
 
     // Push both tags
-    execSync(`docker push "${args.imageUri}"`, {
-      stdio: logger.interactive ? "pipe" : "inherit",
+    const subprocess = execa("docker", ["push", args.imageUri], {
+      all: true,
     });
 
-    logger.success("Image pushed successfully!");
+    for await (const chunk of subprocess.all!) {
+      const line = chunk.toString();
+      if (logger.debug) logger.debugInfo(line.trim());
+      await new Promise((r) => setTimeout(r, 0));
+    }
+
+    await subprocess;
+
+    logger.debugInfo("Image pushed successfully!");
   } catch (error) {
     logger.error("Docker push failed:", error);
     process.exit(1);
   }
 }
 
-export function dockerGetImageHash(args: { localImage: string }): string {
-  let result = execSync(
+export async function dockerGetImageHash(args: {
+  localImage: string;
+}): Promise<string> {
+  const { stdout } = await execa("bash", [
+    "-c",
     `docker image inspect --format='{{.RootFS.Layers}}' ${args.localImage} | sha256sum`,
-    {
-      encoding: "utf-8",
-    }
-  );
+  ]);
+  let result = stdout;
   result = result.replaceAll("-", "");
   result = result.trim();
 

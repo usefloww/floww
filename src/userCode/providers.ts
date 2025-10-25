@@ -20,6 +20,14 @@ export function getRegisteredTriggers() {
   return Array.from(_registeredTriggers);
 }
 
+export function clearRegisteredTriggers() {
+  _registeredTriggers.clear();
+}
+
+export function clearUsedProviders() {
+  _usedProviders.clear();
+}
+
 export async function getProvider<T extends "gitlab" | "slack">(
   provider: T,
   alias: string = "default"

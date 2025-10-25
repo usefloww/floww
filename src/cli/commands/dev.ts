@@ -27,16 +27,16 @@ export async function devCommand(
     logger.warn(
       "WARNING: Debugging features are not supported when running with Bun."
     );
-    logger.plain.warn(
+    logger.console.warn(
       "   The Node.js Inspector protocol is not available in Bun runtime."
     );
-    logger.plain.warn(
+    logger.console.warn(
       "   For debugging support, please use Node.js or tsx instead:"
     );
-    logger.plain.warn("     node dist/cli.js dev --debug");
-    logger.plain.warn("     # or");
-    logger.plain.warn("     tsx src/cli/index.ts dev --debug");
-    logger.plain.warn("   Continuing in normal mode without debugging...");
+    logger.console.warn("     node dist/cli.js dev --debug");
+    logger.console.warn("     # or");
+    logger.console.warn("     tsx src/cli/index.ts dev --debug");
+    logger.console.warn("   Continuing in normal mode without debugging...");
 
     // Disable debug mode when running with Bun
     debugMode = false;
@@ -56,13 +56,13 @@ export async function devCommand(
 
   // Resolve to absolute path
 
-  logger.info(`Development Mode${debugMode ? " (Debug Enabled)" : ""}`);
-  logger.plain(`📂 Watching: ${entrypoint}`);
+  console.log(`🚀 Development Mode${debugMode ? " (Debug Enabled)" : ""}`);
+  console.log(`📂 Watching: ${entrypoint}`);
   if (debugMode) {
-    logger.plain(`🐛 Debug mode enabled on port ${debugPort}`);
-    logger.plain(`   • Enhanced error reporting`);
-    logger.plain(`   • Source map support`);
-    logger.plain(`   • Debug utilities available in user code`);
+    console.log(`🐛 Debug mode enabled on port ${debugPort}`);
+    logger.debugInfo(`   • Enhanced error reporting`);
+    logger.debugInfo(`   • Source map support`);
+    logger.debugInfo(`   • Debug utilities available in user code`);
   }
 
   const engine = new FlowEngine(port, host, debugMode, debugPort);
@@ -70,8 +70,8 @@ export async function devCommand(
   // Load triggers and providers
   let loadResult: EngineLoadResult;
   try {
-    await logger.task("Loading triggers", async () => {
-      loadResult = await engine.load(entrypoint);
+    loadResult = await logger.debugTask("Loading triggers", async () => {
+      return await engine.load(entrypoint);
     });
   } catch (error) {
     logger.error("Failed to load:", error);
@@ -80,39 +80,29 @@ export async function devCommand(
 
   // Check and setup providers after loading
   try {
-    await logger.task("Checking providers", async () => {
-      const usedProviders = loadResult.providers.map((p: any) => ({
-        type: p.provider,
-        alias: p.alias === "default" ? undefined : p.alias,
-      }));
+    const usedProviders = loadResult.providers.map((p: any) => ({
+      type: p.provider,
+      alias: p.alias === "default" ? undefined : p.alias,
+    }));
 
-      if (usedProviders.length === 0) {
-        console.log("✅ No providers used - nothing to configure");
-        return;
-      }
-
-      console.log(`📋 Found ${usedProviders.length} used provider(s):`);
-      usedProviders.forEach((p: any) => {
-        console.log(`  • ${p.type}${p.alias ? ` (alias: ${p.alias})` : ""}`);
-      });
+    if (usedProviders.length === 0) {
+      logger.debugInfo("No providers used - nothing to configure");
+    } else {
+      logger.debugInfo(`Found ${usedProviders.length} used provider(s):`, usedProviders);
 
       const availability = await checkProviderAvailability(usedProviders);
 
       if (availability && availability.available && availability.available.length > 0) {
-        console.log(
-          `✅ ${availability.available.length} provider(s) already configured`
-        );
+        logger.debugInfo(`${availability.available.length} provider(s) already configured`);
       }
 
       if (availability && availability.unavailable && availability.unavailable.length > 0) {
-        console.log(
-          `⚠️ ${availability.unavailable.length} provider(s) need configuration`
-        );
+        console.log(`⚠️  ${availability.unavailable.length} provider(s) need configuration`);
         await setupUnavailableProviders(availability.unavailable);
       } else {
-        console.log("🎉 All providers are already configured!");
+        logger.debugInfo("All providers are already configured!");
       }
-    });
+    }
   } catch (error) {
     logger.error("Provider setup failed:", error);
     process.exit(1);
@@ -120,9 +110,11 @@ export async function devCommand(
 
   // Start the engine
   try {
-    await logger.task("Starting Flow Engine", async () => {
+    await logger.debugTask("Starting Flow Engine", async () => {
       await engine.start();
     });
+    // Show user-friendly message when ready
+    console.log("🚀 Development server is ready!");
   } catch (error) {
     logger.error("Failed to start:", error);
     process.exit(1);
@@ -135,11 +127,13 @@ export async function devCommand(
   });
 
   watcher.on("change", async (path) => {
-    logger.info(`File changed: ${path}`);
+    console.log(); // Add line above file change for visual separation
+    console.log(`🔄 File changed: ${path}`);
     try {
-      await logger.task("Reloading triggers", async () => {
+      await logger.debugTask("Reloading triggers", async () => {
         await engine.reload(entrypoint);
       });
+      console.log("✅ Reloaded successfully");
     } catch (error) {
       logger.error("Failed to reload:", error);
     }

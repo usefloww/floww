@@ -62,6 +62,7 @@
     "cli-table3": "^0.6.5",
     "commander": "^14.0.1",
     "consola": "^3.4.2",
+    "execa": "^9.6.0",
     "fastify": "^5.6.1",
     "ink": "^6.3.1",
     "inquirer": "^12.9.6",

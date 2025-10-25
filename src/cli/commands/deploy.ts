@@ -48,14 +48,14 @@ function ensureDockerfile(projectDir: string, projectConfig: any): string {
   const dockerfilePath = path.join(projectDir, "Dockerfile");
 
   if (!fs.existsSync(dockerfilePath)) {
-    logger.info("No Dockerfile found, creating default...");
+    logger.debugInfo("No Dockerfile found, creating default...");
     const entrypoint = projectConfig.entrypoint || "main.ts";
     const dockerfileContent = defaultDockerfileContent.replace(
       "ENV FLOWW_ENTRYPOINT=main.ts",
       `ENV FLOWW_ENTRYPOINT=${entrypoint}`
     );
     fs.writeFileSync(dockerfilePath, dockerfileContent.trim());
-    logger.success("Created default Dockerfile");
+    logger.debugInfo("Created default Dockerfile");
   }
 
   return dockerfilePath;
@@ -113,7 +113,7 @@ async function selectWorkflow(): Promise<string> {
   } else {
     // Non-interactive mode: return first workflow
     const selectedWorkflow = workflows[0];
-    logger.info(`Auto-selected workflow: ${selectedWorkflow.name}`);
+    logger.debugInfo(`Auto-selected workflow: ${selectedWorkflow.name}`);
     logger.tip('Run "floww init" to set a default workflow for this project');
     return selectedWorkflow.id;
   }
@@ -140,13 +140,11 @@ export async function deployCommand() {
 
   // Auto-initialize if no config exists
   if (!hasProjectConfig()) {
-    logger.info(
-      "No project configuration found. Let's set up your project first!"
-    );
+    console.log("🔧 Setting up project configuration...");
 
     try {
       await initCommand({ silent: false });
-      logger.info("Continuing with deployment...");
+      console.log("✅ Project configured, continuing with deployment");
     } catch (error) {
       logger.error(
         "Initialization failed:",
@@ -161,14 +159,14 @@ export async function deployCommand() {
 
   // Handle workflow selection if workflowId is missing (fallback)
   if (!projectConfig.workflowId) {
-    logger.info("No workflowId specified, selecting workflow...");
+    console.log("🎯 Selecting deployment workflow...");
 
     try {
       const selectedWorkflowId = await selectWorkflow();
 
       // Update floww.yaml with selected workflow
       projectConfig = updateProjectConfig({ workflowId: selectedWorkflowId });
-      logger.success("Workflow saved to floww.yaml");
+      logger.debugInfo("Workflow saved to floww.yaml");
     } catch (error) {
       logger.error(
         "Workflow selection failed:",
@@ -220,31 +218,34 @@ export async function deployCommand() {
 
   // 2. Validate providers are configured (non-interactive check for deploy)
   const entrypoint = projectConfig.entrypoint || "main.ts";
-  const providerValidation = await logger.task("Validating providers", async () => {
-    // Use engine loading approach to get providers
-    const engine = new FlowEngine(3000, "localhost", false);
-    const loadResult = await engine.load(entrypoint);
+  const providerValidation = await logger.debugTask(
+    "Validating providers",
+    async () => {
+      // Use engine loading approach to get providers
+      const engine = new FlowEngine(3000, "localhost", false);
+      const loadResult = await engine.load(entrypoint);
 
-    const usedProviders = loadResult.providers.map((p: any) => ({
-      type: p.provider,
-      alias: p.alias === "default" ? undefined : p.alias,
-    }));
+      const usedProviders = loadResult.providers.map((p: any) => ({
+        type: p.provider,
+        alias: p.alias === "default" ? undefined : p.alias,
+      }));
 
-    if (usedProviders.length === 0) {
-      return { valid: true, unavailable: [] };
+      if (usedProviders.length === 0) {
+        return { valid: true, unavailable: [] };
+      }
+
+      const availability = await checkProviderAvailability(usedProviders);
+
+      if (availability.unavailable.length === 0) {
+        return { valid: true, unavailable: [] };
+      }
+
+      const unavailableTypes = [
+        ...new Set(availability.unavailable.map((p) => p.type)),
+      ];
+      return { valid: false, unavailable: unavailableTypes };
     }
-
-    const availability = await checkProviderAvailability(usedProviders);
-
-    if (availability.unavailable.length === 0) {
-      return { valid: true, unavailable: [] };
-    }
-
-    const unavailableTypes = [
-      ...new Set(availability.unavailable.map((p) => p.type)),
-    ];
-    return { valid: false, unavailable: unavailableTypes };
-  });
+  );
 
   if (!providerValidation.valid) {
     logger.error("Missing providers detected:", providerValidation.unavailable);
@@ -252,37 +253,47 @@ export async function deployCommand() {
     process.exit(1);
   }
 
+  console.log("🚀 Starting deployment...");
+
   // 3. Ensure Dockerfile exists
   ensureDockerfile(projectDir, projectConfig);
 
   // 3.5. Pre-build SDK if in monorepo (for faster Docker builds)
-  const isInSdkExamples = projectDir.includes('/examples/');
+  const isInSdkExamples = projectDir.includes("/examples/");
   if (isInSdkExamples) {
-    await logger.task("Pre-building SDK", async () => {
+    await logger.debugTask("Pre-building SDK", async () => {
       const { execSync } = await import("child_process");
       const sdkDir = `${projectDir}/../..`;
 
       // Install and build SDK, remove self-referential link, and pack
-      execSync(`
+      execSync(
+        `
         pnpm install &&
         pnpm build &&
         node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); delete pkg.dependencies['@DeveloperFlows/floww-sdk']; fs.writeFileSync('package.json',JSON.stringify(pkg,null,2));" &&
         pnpm pack --pack-destination ./ &&
         git checkout package.json
-      `, {
-        cwd: sdkDir,
-        stdio: logger.interactive ? "pipe" : "inherit",
-        shell: "/bin/bash",
-      });
+      `,
+        {
+          cwd: sdkDir,
+          stdio: logger.interactive ? "pipe" : "inherit",
+          shell: "/bin/bash",
+        }
+      );
     });
   }
 
   // 4. Build Docker image
-  const buildResult = await logger.task("Building Docker image", async () => {
-    return dockerBuildImage(projectConfig, projectDir);
-  });
+  const buildResult = await logger.task(
+    "📦 Building runtime image",
+    async () => {
+      return await dockerBuildImage(projectConfig, projectDir);
+    }
+  );
 
-  const imageHash = dockerGetImageHash({ localImage: buildResult.localImage });
+  const imageHash = await dockerGetImageHash({
+    localImage: buildResult.localImage,
+  });
 
   let shouldPush = true;
   let pushData: PushTokenResponse = {} as any;
@@ -303,45 +314,53 @@ export async function deployCommand() {
 
   // 5. Push images to registry (only if needed)
   if (shouldPush) {
-    await logger.task("Pushing image", async () => {
-      const imageUri = `${pushData.registry_url}:${imageHash}`;
-      dockerRetagImage({
-        currentTag: buildResult.localImage,
-        newTag: imageUri,
-      });
-      dockerLogin({
-        registryUrl: pushData.registry_url,
-        token: pushData.password,
-      });
-      dockerPushImage({ imageUri: imageUri });
-    });
+    await logger.task(
+      "☁️  Uploading runtime image (this may take a moment)",
+      async () => {
+        const imageUri = `${pushData.registry_url}:${imageHash}`;
+        await dockerRetagImage({
+          currentTag: buildResult.localImage,
+          newTag: imageUri,
+        });
+        await dockerLogin({
+          registryUrl: pushData.registry_url,
+          token: pushData.password,
+        });
+        await dockerPushImage({ imageUri: imageUri });
+      }
+    );
+  } else {
+    logger.debugInfo("Runtime image already exists, skipping upload");
   }
 
   // 6. Create and prepare runtime
-  const runtimeResult = await logger.task("Setting up runtime", async () => {
-    try {
-      const runtime = await createRuntime({
-        config: {
-          image_hash: imageHash,
-        },
-      });
-      await pollRuntimeUntilReady(runtime.id);
-      return runtime;
-    } catch (error) {
-      if (error instanceof RuntimeAlreadyExistsError) {
-        // Fetch the existing runtime status and wait for it to be ready
-        const runtime = await getRuntimeStatus(error.runtimeId);
+  const runtimeResult = await logger.task(
+    "⚙️  Setting up runtime environment",
+    async () => {
+      try {
+        const runtime = await createRuntime({
+          config: {
+            image_hash: imageHash,
+          },
+        });
         await pollRuntimeUntilReady(runtime.id);
         return runtime;
-      } else {
-        logger.error(
-          "Failed to create runtime:",
-          error instanceof Error ? error.message : error
-        );
-        process.exit(1);
+      } catch (error) {
+        if (error instanceof RuntimeAlreadyExistsError) {
+          // Fetch the existing runtime status and wait for it to be ready
+          const runtime = await getRuntimeStatus(error.runtimeId);
+          await pollRuntimeUntilReady(runtime.id);
+          return runtime;
+        } else {
+          logger.error(
+            "Failed to create runtime:",
+            error instanceof Error ? error.message : error
+          );
+          process.exit(1);
+        }
       }
     }
-  });
+  );
 
   // 7. Read project files and parse triggers
   const userCode = await readProjectFiles(projectDir, entrypoint);
@@ -349,47 +368,53 @@ export async function deployCommand() {
   // Parse triggers to extract metadata
   const { executeUserProject } = await import("@/codeExecution");
 
-  const triggersMetadata = await logger.task("Extracting trigger metadata", async () => {
-    try {
-      // Use the files we already read
-      const entryPointName = entrypoint.replace(/\.ts$/, '') + '.default';
-      const module = await executeUserProject({
-        files: userCode.files,
-        entryPoint: entryPointName,
-      });
-      const triggers = module.default;
+  const triggersMetadata = await logger.debugTask(
+    "Extracting trigger metadata",
+    async () => {
+      try {
+        // Use the files we already read
+        const entryPointName = entrypoint.replace(/\.ts$/, "") + ".default";
+        const module = await executeUserProject({
+          files: userCode.files,
+          entryPoint: entryPointName,
+        });
+        const triggers = module.default;
 
-      if (!Array.isArray(triggers)) {
-        throw new Error("Triggers file must export an array of triggers");
-      }
-
-      // Extract metadata from triggers
-      return triggers.map((trigger: any) => {
-        const metadata: any = { type: trigger.type };
-
-        if (trigger.type === "webhook") {
-          // Only include path if explicitly set by user
-          // Provider webhooks (without path) will get auto-generated UUID paths
-          if (trigger.path) {
-            metadata.path = trigger.path;
-          }
-          metadata.method = trigger.method || "POST";
-        } else if (trigger.type === "cron") {
-          metadata.expression = trigger.expression;
-        } else if (trigger.type === "realtime") {
-          metadata.channel = trigger.channel;
+        if (!Array.isArray(triggers)) {
+          throw new Error("Triggers file must export an array of triggers");
         }
 
-        return metadata;
-      });
-    } catch (error) {
-      logger.warn("Failed to extract trigger metadata:", error instanceof Error ? error.message : error);
-      return [];
+        // Extract metadata from triggers
+        return triggers.map((trigger: any) => {
+          const metadata: any = { type: trigger.type };
+
+          if (trigger.type === "webhook") {
+            // Only include path if explicitly set by user
+            // Provider webhooks (without path) will get auto-generated UUID paths
+            if (trigger.path) {
+              metadata.path = trigger.path;
+            }
+            metadata.method = trigger.method || "POST";
+          } else if (trigger.type === "cron") {
+            metadata.expression = trigger.expression;
+          } else if (trigger.type === "realtime") {
+            metadata.channel = trigger.channel;
+          }
+
+          return metadata;
+        });
+      } catch (error) {
+        logger.warn(
+          "Failed to extract trigger metadata:",
+          error instanceof Error ? error.message : error
+        );
+        return [];
+      }
     }
-  });
+  );
 
   // 8. Create workflow deployment with triggers metadata
-  const deployment = await logger.task("Deploying workflow", async () => {
+  const deployment = await logger.task("🚀 Deploying workflow", async () => {
     return await createWorkflowDeployment({
       workflow_id: projectConfig.workflowId!,
       runtime_id: runtimeResult.id,
@@ -398,13 +423,17 @@ export async function deployCommand() {
     });
   });
 
+  console.log("\n✨ Deployment successful!");
+
   // Display webhook URLs if available
   if (deployment.webhooks && deployment.webhooks.length > 0) {
-    logger.success("\nWebhook URLs:");
+    console.log("\n📌 Webhook URLs:");
     for (const webhook of deployment.webhooks) {
-      const pathInfo = webhook.path ? ` ${webhook.method || "POST"} ${webhook.path}` : "";
-      logger.plain(`  📌${pathInfo}`);
-      logger.plain(`     → ${webhook.url}`);
+      const pathInfo = webhook.path
+        ? ` ${webhook.method || "POST"} ${webhook.path}`
+        : "";
+      console.log(`  ${pathInfo}`);
+      console.log(`     → ${webhook.url}`);
     }
   }
 }
