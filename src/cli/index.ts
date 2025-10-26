@@ -16,6 +16,7 @@ import {
   listWorkflowsCommand,
   listNamespacesCommand,
   listDeploymentsCommand,
+  listProvidersCommand,
 } from "./crud/list";
 import { manageProviders } from "./providers/index";
 
@@ -124,6 +125,11 @@ listCmd
   .action(async (options) => {
     await listDeploymentsCommand(options.workflow);
   });
+
+listCmd
+  .command("providers")
+  .description("List all providers")
+  .action(listProvidersCommand);
 
 // Provider management commands
 // program

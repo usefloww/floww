@@ -7,6 +7,8 @@ import {
   select,
   multiselect,
   spinner,
+  isCancel,
+  cancel,
 } from "@clack/prompts";
 import {
   fetchProviderType,
@@ -18,7 +20,7 @@ import { UsedProvider } from "./availability";
 import { logger } from "../utils/logger";
 
 export async function setupUnavailableProviders(
-  unavailableProviders: UsedProvider[],
+  unavailableProviders: UsedProvider[]
 ): Promise<void> {
   if (unavailableProviders.length === 0) {
     return;
@@ -27,11 +29,13 @@ export async function setupUnavailableProviders(
   intro("🔌 Provider Setup Required");
 
   console.log(
-    `Found ${unavailableProviders.length} unavailable provider(s) that need to be configured:`,
+    `Found ${unavailableProviders.length} unavailable provider(s) that need to be configured:`
   );
   unavailableProviders.forEach((provider) => {
     console.log(
-      `  • ${provider.type}${provider.alias ? ` (alias: ${provider.alias})` : ""}`,
+      `  • ${provider.type}${
+        provider.alias ? ` (alias: ${provider.alias})` : ""
+      }`
     );
   });
 
@@ -39,6 +43,11 @@ export async function setupUnavailableProviders(
     message: "Would you like to set up these providers now?",
     initialValue: true,
   });
+
+  if (isCancel(shouldContinue)) {
+    cancel("Operation cancelled.");
+    process.exit(0);
+  }
 
   if (!shouldContinue) {
     outro("❌ Provider setup cancelled. Your code may not work correctly.");
@@ -65,6 +74,12 @@ export async function setupUnavailableProviders(
         hint: ns.name,
       })),
     });
+
+    if (isCancel(namespaceChoice)) {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
     selectedNamespaceId = namespaceChoice as string;
   }
 
@@ -78,10 +93,12 @@ export async function setupUnavailableProviders(
 
 async function setupSingleProvider(
   provider: UsedProvider,
-  namespaceId: string,
+  namespaceId: string
 ): Promise<void> {
   console.log(
-    `\n🔧 Setting up ${provider.type}${provider.alias ? ` (alias: ${provider.alias})` : ""}...`,
+    `\n🔧 Setting up ${provider.type}${
+      provider.alias ? ` (alias: ${provider.alias})` : ""
+    }...`
   );
 
   try {
@@ -96,7 +113,7 @@ async function setupSingleProvider(
 
     for (const step of providerType.setup_steps) {
       const value = await promptForSetupStep(step);
-      config[step.field_name] = value;
+      config[step.alias] = value;
     }
 
     // Create the provider
@@ -118,10 +135,18 @@ async function setupSingleProvider(
 }
 
 async function promptForSetupStep(step: ProviderSetupStep): Promise<string> {
+  // Build message with optional description hint
+  let message = step.title;
+  if (step.description && step.description !== step.title) {
+    message += ` (${step.description})`;
+  }
+
+  step.placeholder = "glpat-xxx";
+
   const basePrompt = {
-    message: step.label,
+    message,
     placeholder: step.placeholder,
-    defaultValue: step.default_value,
+    initialValue: step.default,
     validate: (value: string) => {
       if (step.required && (!value || value.trim() === "")) {
         return "This field is required";
@@ -130,22 +155,28 @@ async function promptForSetupStep(step: ProviderSetupStep): Promise<string> {
     },
   };
 
-  // Add description as a hint if available
-  if (step.description) {
-    console.log(`💡 ${step.description}`);
-  }
+  let result: string | symbol;
 
   switch (step.type) {
     case "password":
     case "secret":
     case "token":
-      return (await password(basePrompt)) as string;
+      result = await text(basePrompt);
+      break;
 
     case "text":
     case "string":
     case "url":
     case "email":
     default:
-      return (await text(basePrompt)) as string;
+      result = await text(basePrompt);
+      break;
   }
+
+  if (isCancel(result)) {
+    cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  return result as string;
 }

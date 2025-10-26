@@ -2,9 +2,11 @@ import {
   fetchWorkflows,
   fetchNamespaces,
   listWorkflowDeployments,
+  fetchProviders,
   type Workflow,
   type Namespace,
   type WorkflowDeploymentResponse,
+  type Provider,
 } from "../api/apiMethods";
 import Table from "cli-table3";
 import chalk from "chalk";
@@ -238,6 +240,67 @@ export async function listDeploymentsCommand(workflowId?: string) {
   } catch (error) {
     console.error(
       `${logSymbols.error} ${chalk.red("Failed to fetch deployments:")} ${error}`,
+    );
+    process.exit(1);
+  }
+}
+
+export async function listProvidersCommand() {
+  try {
+    console.log(`${logSymbols.info} ${chalk.blue("Fetching providers...")}`);
+    const providers = await fetchProviders();
+
+    if (providers.length === 0) {
+      console.log(
+        `\n${logSymbols.warning} ${chalk.yellow("No providers found")}`,
+      );
+      return;
+    }
+
+    const table = new Table({
+      head: [
+        chalk.gray("ALIAS"),
+        chalk.gray("TYPE"),
+        chalk.gray("NAMESPACE"),
+        chalk.gray("ID"),
+      ],
+      style: {
+        head: [],
+        border: [],
+      },
+      chars: {
+        top: "",
+        "top-mid": "",
+        "top-left": "",
+        "top-right": "",
+        bottom: "",
+        "bottom-mid": "",
+        "bottom-left": "",
+        "bottom-right": "",
+        left: "",
+        "left-mid": "",
+        mid: "",
+        "mid-mid": "",
+        right: "",
+        "right-mid": "",
+        middle: " ",
+      },
+    });
+
+    providers.forEach((provider: Provider) => {
+      table.push([
+        chalk.white(provider.alias),
+        chalk.cyan(provider.type),
+        chalk.dim(provider.namespace_id.substring(0, 8)),
+        chalk.dim(provider.id.substring(0, 8)),
+      ]);
+    });
+
+    console.log("\n" + table.toString());
+    console.log(`\n${chalk.dim(`Total: ${providers.length} providers`)}`);
+  } catch (error) {
+    console.error(
+      `${logSymbols.error} ${chalk.red("Failed to fetch providers:")} ${error}`,
     );
     process.exit(1);
   }
