@@ -80,9 +80,7 @@ export class CommandSpace {
 
     // Use the exact node executable that VS Code is configured to use
     const nodeExecutable =
-      process.env.VITEST_NODE_EXECUTABLE ||
-      "/Users/toon/.local/share/mise/installs/node/22.15.0/bin/node" ||
-      process.execPath;
+      process.env.VITEST_NODE_EXECUTABLE || process.execPath;
 
     // Use tsx binary directly with full node path
     const tsxBin = path.join(
@@ -102,6 +100,8 @@ export class CommandSpace {
           ...process.env,
           FLOWW_NAMESPACE_ID: "test-namespace-id",
           PATH: path.dirname(nodeExecutable) + ":" + (process.env.PATH || ""),
+          // Use isolated config directory for tests
+          XDG_CONFIG_HOME: path.join(this.tempDir, ".config"),
         },
         stdio: "pipe",
       }

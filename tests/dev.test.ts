@@ -56,16 +56,16 @@ describe("Dev Mode E2E Tests", () => {
   it("should start dev mode and show development message", async () => {
     const command = commandSpace.backgroundCommand("dev");
 
-    await waitUntilStdout(command, "Development Mode");
+    await waitUntilStdout(command, "Watching:");
 
-    expect(command.stdout()).toContain("Development Mode");
+    expect(command.stdout()).toContain("Watching:");
   });
 
   it("should reload when file changes", async () => {
     const command = commandSpace.backgroundCommand("dev");
 
     // Wait for dev mode to fully start
-    await waitUntilStdout(command, "Flow Engine running");
+    await waitUntilStdout(command, "Development server is ready");
 
     // Change file
     await commandSpace.putFile({
@@ -85,12 +85,12 @@ export default [
 `,
     });
 
-    await waitUntilStdout(command, "Reloading triggers", 5000);
+    await waitUntilStdout(command, "File changed", 5000);
 
     // Wait for the updated trigger to actually execute
     await waitUntilStdout(command, "UPDATED: Cron triggered", 8000);
 
-    expect(command.stdout()).toContain("Reloading triggers");
+    expect(command.stdout()).toContain("File changed");
     expect(command.stdout()).toContain("UPDATED: Cron triggered");
   });
 

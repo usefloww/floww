@@ -41,7 +41,7 @@ export interface DevModeOptions {
 export class DevModeOrchestrator {
   private workflow?: WorkflowConfig;
   private providerConfigs?: Map<string, ProviderConfig>;
-  private eventRouter: EventRouter;
+  private eventRouter?: EventRouter;
   private debugContext?: DebugContext;
 
   constructor(private options: DevModeOptions) {
@@ -51,12 +51,7 @@ export class DevModeOrchestrator {
       this.debugContext.enableDebug(true, options.debugPort || 9229);
     }
 
-    // Create event router
-    this.eventRouter = new EventRouter(
-      options.port,
-      options.host,
-      this.debugContext,
-    );
+    // EventRouter will be created in start() after workflow is resolved
   }
 
   /**
@@ -79,6 +74,14 @@ export class DevModeOrchestrator {
       async () => await resolveWorkflow(projectConfig),
     );
 
+    // Create event router now that we have workflow ID
+    this.eventRouter = new EventRouter(
+      this.options.port,
+      this.options.host,
+      this.debugContext,
+      this.workflow.workflowId,
+    );
+
     // Step 2: Fetch provider configs
     this.providerConfigs = await logger.debugTask(
       "Fetching provider configs",
@@ -97,6 +100,11 @@ export class DevModeOrchestrator {
     // Step 4: Validate providers
     await validateProviders(result.usedProviders, { interactive: true });
 
+    // Step 4.5: Sync triggers with backend (deploy webhooks to production)
+    await logger.debugTask("Syncing triggers with backend", async () => {
+      await this.syncTriggersWithBackend(result.triggers);
+    });
+
     // Step 5: Setup event routing
     await logger.debugTask("Starting Flow Engine", async () => {
       await this.eventRouter.start(result.triggers);
@@ -114,6 +122,52 @@ export class DevModeOrchestrator {
   }
 
   /**
+   * Sync triggers with backend - create real webhooks in production
+   * but route events back to local dev session via websocket
+   */
+  private async syncTriggersWithBackend(triggers: any[]): Promise<void> {
+    if (!this.workflow) {
+      return;
+    }
+
+    const {syncDevTriggers} = await import("../api/apiMethods");
+
+    // Convert triggers to metadata format (similar to deploy)
+    const triggersMetadata = triggers.map((trigger: any) => {
+      const metadata: any = { type: trigger.type };
+
+      // Add provider metadata if available
+      if (trigger._providerMeta) {
+        metadata.provider_type = trigger._providerMeta.type;
+        metadata.provider_alias = trigger._providerMeta.alias;
+        metadata.trigger_type = trigger._providerMeta.triggerType;
+        metadata.input = trigger._providerMeta.input;
+      }
+
+      if (trigger.type === "webhook") {
+        if (trigger.path) {
+          metadata.path = trigger.path;
+        }
+        metadata.method = trigger.method || "POST";
+      } else if (trigger.type === "cron") {
+        metadata.expression = trigger.expression;
+      } else if (trigger.type === "realtime") {
+        metadata.channel = trigger.channel;
+      }
+
+      return metadata;
+    });
+
+    // Sync with backend
+    const response = await syncDevTriggers({
+      workflow_id: this.workflow.workflowId,
+      triggers: triggersMetadata,
+    });
+
+    logger.debugInfo(`Synced ${response.webhooks.length} webhook(s) with backend`);
+  }
+
+  /**
    * Code change reload: Re-execute from step 3
    *
    * When user code changes, we only need to:
@@ -121,7 +175,7 @@ export class DevModeOrchestrator {
    * - Update event routing with new triggers
    */
   async handleReload(): Promise<void> {
-    if (!this.providerConfigs) {
+    if (!this.providerConfigs || !this.eventRouter) {
       throw new Error(
         "Cannot reload: orchestrator not initialized. Call start() first.",
       );
@@ -133,6 +187,9 @@ export class DevModeOrchestrator {
       this.providerConfigs,
       this.debugContext,
     );
+
+    // Sync triggers with backend
+    await this.syncTriggersWithBackend(result.triggers);
 
     // Update event routing with new triggers
     await this.eventRouter.updateTriggers(result.triggers);
@@ -148,7 +205,7 @@ export class DevModeOrchestrator {
    * - Update event routing
    */
   async handleProviderSetup(): Promise<void> {
-    if (!this.workflow) {
+    if (!this.workflow || !this.eventRouter) {
       throw new Error(
         "Cannot handle provider setup: orchestrator not initialized. Call start() first.",
       );
@@ -190,7 +247,9 @@ export class DevModeOrchestrator {
     }
 
     // Stop event routing
-    await this.eventRouter.stop();
+    if (this.eventRouter) {
+      await this.eventRouter.stop();
+    }
 
     console.log("✨ Flow Engine stopped. See you next time! 👋");
   }

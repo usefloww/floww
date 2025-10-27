@@ -6,6 +6,13 @@ const _usedProviders = new Set<string>();
 const _registeredTriggers = new Set<any>();
 const _providerConfigs: Map<string, Record<string, any>> = new Map();
 
+export type ProviderMetadata = {
+  type: string;
+  alias: string;
+  triggerType: string;
+  input: Record<string, any>;
+};
+
 export function getUsedProviders() {
   return Array.from(_usedProviders).map((s) => {
     const [type, alias] = s.split(":");
@@ -28,9 +35,12 @@ export function getProviderConfig(
   return _providerConfigs.get(key);
 }
 
-export function registerTrigger(trigger: any) {
-  _registeredTriggers.add(trigger);
-  return trigger;
+export function registerTrigger(trigger: any, providerMeta?: ProviderMetadata) {
+  const enrichedTrigger = providerMeta
+    ? { ...trigger, _providerMeta: providerMeta }
+    : trigger;
+  _registeredTriggers.add(enrichedTrigger);
+  return enrichedTrigger;
 }
 
 export function getRegisteredTriggers() {

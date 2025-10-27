@@ -121,12 +121,6 @@ importers:
         specifier: ^4.19.2
         version: 4.20.5
 
-  examples/test_wzso47:
-    dependencies:
-      '@developerflows/floww-sdk':
-        specifier: file:../../..
-        version: floww@file:..
-
 packages:
 
   '@alcalzone/ansi-tokenize@0.2.2':
@@ -1159,9 +1153,6 @@ packages:
 
   fix-dts-default-cjs-exports@1.0.1:
     resolution: {integrity: sha512-pVIECanWFC61Hzl2+oOCtoJ3F17kglZC/6N94eRWycFgBH35hHx0Li604ZIzhseh97mf2p0cv7vVrOZGoqhlEg==}
-
-  floww@file:..:
-    resolution: {directory: .., type: directory}
 
   foreground-child@3.3.1:
     resolution: {integrity: sha512-gIXjKqtFuWEgzFRJA9WCQeSJLZDjgJUOMCMzxtvFq/37KojM1BFGufqsCy0r4qSQmYLsZYMeyRqzIWOMup03sw==}
@@ -2798,8 +2789,6 @@ snapshots:
       magic-string: 0.30.19
       mlly: 1.8.0
       rollup: 4.52.0
-
-  floww@file:..: {}
 
   foreground-child@3.3.1:
     dependencies:

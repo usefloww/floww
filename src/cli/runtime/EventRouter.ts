@@ -35,12 +35,13 @@ export class EventRouter {
     port: number,
     host: string,
     private debugContext?: DebugContext,
+    workflowId?: string,
   ) {
     // Initialize event producers
     this.eventProducers = [
       new WebhookEventProducer(port, host),
       new CronEventProducer(),
-      new WebSocketEventProducer(),
+      new WebSocketEventProducer(workflowId),
     ];
 
     // Setup event routing immediately

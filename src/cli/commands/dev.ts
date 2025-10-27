@@ -71,10 +71,10 @@ export async function devCommand(
     entrypoint = "main.ts";
   }
 
-  console.log(`🚀 Development Mode${debugMode ? " (Debug Enabled)" : ""}`);
-  console.log(`📂 Watching: ${entrypoint}`);
+  logger.info(`Development Mode${debugMode ? " (Debug Enabled)" : ""}`);
+  logger.plain(`📂 Watching: ${entrypoint}`);
   if (debugMode) {
-    console.log(`🐛 Debug mode enabled on port ${debugPort}`);
+    logger.plain(`🐛 Debug mode enabled on port ${debugPort}`);
     logger.debugInfo(`   • Enhanced error reporting`);
     logger.debugInfo(`   • Source map support`);
     logger.debugInfo(`   • Debug utilities available in user code`);
@@ -92,7 +92,7 @@ export async function devCommand(
   // Start dev mode
   try {
     await orchestrator.start();
-    console.log("🚀 Development server is ready!");
+    logger.success("Development server is ready!");
   } catch (error) {
     logger.error("Failed to start:", error);
     process.exit(1);
@@ -105,13 +105,13 @@ export async function devCommand(
   });
 
   watcher.on("change", async (path) => {
-    console.log(); // Add line above file change for visual separation
-    console.log(`🔄 File changed: ${path}`);
+    logger.plain(""); // Add line above file change for visual separation
+    logger.info(`File changed: ${path}`);
     try {
       await logger.debugTask("Reloading triggers", async () => {
         await orchestrator.handleReload();
       });
-      console.log("✅ Reloaded successfully");
+      logger.success("Reloaded successfully");
     } catch (error) {
       logger.error("Failed to reload:", error);
     }

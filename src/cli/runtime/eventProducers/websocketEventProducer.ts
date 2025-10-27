@@ -8,19 +8,24 @@ export class WebSocketEventProducer implements EventProducer {
   private centrifuge: Centrifuge | null = null;
   private isConnected = false;
   private currentStream: EventStream | null = null;
+  private currentTriggers: Trigger[] = [];
+
+  constructor(private workflowId?: string) {}
 
   async updateTriggers(
     triggers: Trigger[],
     stream: EventStream,
   ): Promise<void> {
+    this.currentTriggers = triggers;
+    this.currentStream = stream;
+
     // Filter realtime triggers
     const realtimeTriggers = triggers.filter(
       (t) => t.type === "realtime",
     ) as RealtimeTrigger[];
-    this.currentStream = stream;
 
-    // Start connection if we have realtime triggers and not already connected
-    if (realtimeTriggers.length > 0 && !this.isConnected) {
+    // Start connection if we have realtime triggers OR dev mode, and not already connected
+    if ((realtimeTriggers.length > 0 || this.workflowId) && !this.isConnected) {
       await this.connect();
     }
   }
@@ -71,17 +76,17 @@ export class WebSocketEventProducer implements EventProducer {
   private subscribeToChannel(): void {
     if (!this.centrifuge || !this.currentStream) return;
 
-    // Subscribe to workflow events channel
-    const channel = "workflow:events";
-    const subscription = this.centrifuge.newSubscription(channel);
+    // Subscribe to realtime events channel
+    const realtimeChannel = "workflow:events";
+    const realtimeSubscription = this.centrifuge.newSubscription(realtimeChannel);
 
-    subscription.on("publication", (ctx) => {
+    realtimeSubscription.on("publication", (ctx) => {
       const realtimeEvent: RealtimeEvent = {
         type: ctx.data.type || "default",
         workflow_id: ctx.data.workflow_id || "",
         payload: ctx.data.payload || ctx.data,
         timestamp: new Date().toISOString(),
-        channel: ctx.data.channel || channel,
+        channel: ctx.data.channel || realtimeChannel,
       };
 
       // Just emit the event - let the engine route it to the right triggers
@@ -92,15 +97,67 @@ export class WebSocketEventProducer implements EventProducer {
       });
     });
 
-    subscription.on("subscribed", () => {
-      console.log(`📡 Subscribed to realtime channel: ${channel}`);
+    realtimeSubscription.on("subscribed", () => {
+      console.log(`📡 Subscribed to realtime channel: ${realtimeChannel}`);
     });
 
-    subscription.on("error", (ctx) => {
+    realtimeSubscription.on("error", (ctx) => {
       console.log("Subscription error:", ctx.error);
     });
 
-    subscription.subscribe();
+    realtimeSubscription.subscribe();
+
+    // Subscribe to dev webhook channel if workflowId is provided
+    if (this.workflowId) {
+      const devChannel = `dev:workflow:${this.workflowId}`;
+      const devSubscription = this.centrifuge.newSubscription(devChannel);
+
+      devSubscription.on("publication", (ctx) => {
+        if (ctx.data.type === "webhook") {
+          // Match trigger by metadata
+          const matchingTrigger = this.currentTriggers.find((t: any) => {
+            if (!t._providerMeta || !ctx.data.trigger_metadata) return false;
+
+            return (
+              t._providerMeta.type === ctx.data.trigger_metadata.provider_type &&
+              t._providerMeta.alias === ctx.data.trigger_metadata.provider_alias &&
+              t._providerMeta.triggerType === ctx.data.trigger_metadata.trigger_type &&
+              JSON.stringify(t._providerMeta.input) === JSON.stringify(ctx.data.trigger_metadata.input)
+            );
+          });
+
+          if (matchingTrigger) {
+            // Emit webhook event with matched trigger
+            this.currentStream!.emit("data", {
+              type: "webhook",
+              trigger: matchingTrigger,
+              data: {
+                body: ctx.data.body,
+                headers: ctx.data.headers,
+                query: ctx.data.query,
+                method: ctx.data.method,
+                path: ctx.data.path,
+              },
+            });
+          } else {
+            console.warn(
+              `Received webhook event but no matching trigger found`,
+              ctx.data.trigger_metadata
+            );
+          }
+        }
+      });
+
+      devSubscription.on("subscribed", () => {
+        console.log(`📡 Subscribed to dev webhook channel: ${devChannel}`);
+      });
+
+      devSubscription.on("error", (ctx) => {
+        console.log("Dev subscription error:", ctx.error);
+      });
+
+      devSubscription.subscribe();
+    }
   }
 
   async stop(): Promise<void> {

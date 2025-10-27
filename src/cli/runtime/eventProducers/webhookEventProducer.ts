@@ -1,10 +1,17 @@
 import Fastify, { FastifyInstance } from "fastify";
 import { WebhookTrigger, WebhookEvent, Trigger } from "../../../common";
 import { EventProducer, EventStream } from "../types";
+import { randomUUID } from "crypto";
+
+type WebhookMetadata = {
+  trigger: WebhookTrigger;
+  path: string;
+  metadata: Map<string, any>;
+};
 
 export class WebhookEventProducer implements EventProducer {
   private app: FastifyInstance | null = null;
-  private webhooks: Map<string, WebhookTrigger> = new Map();
+  private webhooks: Map<string, WebhookMetadata> = new Map();
   private isServerStarted = false;
 
   constructor(
@@ -21,10 +28,50 @@ export class WebhookEventProducer implements EventProducer {
       (t) => t.type === "webhook",
     ) as WebhookTrigger[];
 
+    // Call teardown on old triggers that are being removed
+    for (const [path, webhookMeta] of this.webhooks.entries()) {
+      if (!webhookTriggers.includes(webhookMeta.trigger)) {
+        if (webhookMeta.trigger.teardown) {
+          try {
+            await webhookMeta.trigger.teardown({
+              getMetadata: (key: string) => webhookMeta.metadata.get(key),
+            });
+          } catch (error) {
+            console.error(`❌ Failed to teardown webhook ${path}:`, error);
+          }
+        }
+      }
+    }
+
     // Update webhooks map
     this.webhooks.clear();
     for (const trigger of webhookTriggers) {
-      this.webhooks.set(trigger.path || "/webhook", trigger);
+      // Generate unique path for this webhook
+      const path = trigger.path || `/${randomUUID()}`;
+      const webhookUrl = `http://${this.host}:${this.port}/webhook${path}`;
+
+      // Create metadata storage
+      const metadata = new Map<string, any>();
+
+      // Store webhook info
+      this.webhooks.set(path, {
+        trigger,
+        path,
+        metadata,
+      });
+
+      // Call setup hook if exists
+      if (trigger.setup) {
+        try {
+          await trigger.setup({
+            webhookUrl,
+            setMetadata: (key: string, value: any) => metadata.set(key, value),
+          });
+        } catch (error) {
+          console.error(`❌ Failed to setup webhook ${path}:`, error);
+          throw error;
+        }
+      }
     }
 
     // Start server if not already started
@@ -44,9 +91,9 @@ export class WebhookEventProducer implements EventProducer {
 
       this.app.all("/webhook/*", async (request, reply) => {
         const path = request.url.replace("/webhook", "");
-        const trigger = this.webhooks.get(path);
+        const webhookMeta = this.webhooks.get(path);
 
-        if (!trigger) {
+        if (!webhookMeta) {
           return reply.code(404).send({ error: "Webhook not found" });
         }
 
@@ -58,9 +105,9 @@ export class WebhookEventProducer implements EventProducer {
           path: request.url,
         };
 
-        if (trigger.validation) {
+        if (webhookMeta.trigger.validation) {
           try {
-            const isValid = await trigger.validation(webhookEvent);
+            const isValid = await webhookMeta.trigger.validation(webhookEvent);
             if (!isValid) {
               return reply
                 .code(401)
@@ -72,7 +119,7 @@ export class WebhookEventProducer implements EventProducer {
           }
         }
 
-        stream.emit("data", { type: "webhook", trigger, data: webhookEvent });
+        stream.emit("data", { type: "webhook", trigger: webhookMeta.trigger, data: webhookEvent });
         return reply.code(200).send({ success: true });
       });
 
@@ -85,6 +132,23 @@ export class WebhookEventProducer implements EventProducer {
   }
 
   async stop(): Promise<void> {
+    // Call teardown on all webhooks
+    for (const [path, webhookMeta] of this.webhooks.entries()) {
+      if (webhookMeta.trigger.teardown) {
+        try {
+          await webhookMeta.trigger.teardown({
+            getMetadata: (key: string) => webhookMeta.metadata.get(key),
+          });
+        } catch (error) {
+          console.error(`❌ Failed to teardown webhook ${path}:`, error);
+        }
+      }
+    }
+
+    // Clear webhooks
+    this.webhooks.clear();
+
+    // Stop server
     if (this.app) {
       await this.app.close();
       this.app = null;

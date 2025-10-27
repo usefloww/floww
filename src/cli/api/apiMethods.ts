@@ -419,3 +419,31 @@ export async function deleteProvider(providerId: string): Promise<void> {
     throw new Error(`HTTP ${response.status}: ${await response.text()}`);
   }
 }
+
+// Dev Mode API methods
+export interface DevTriggerSyncRequest {
+  workflow_id: string;
+  triggers: any[];  // TriggerMetadata[]
+}
+
+export interface DevTriggerSyncResponse {
+  webhooks: Array<{
+    id: string;
+    url: string;
+    path?: string;
+    method?: string;
+  }>;
+}
+
+export async function syncDevTriggers(
+  data: DevTriggerSyncRequest
+): Promise<DevTriggerSyncResponse> {
+  const response = await makeApiCall("/dev/sync-triggers", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+  return (await response.json()) as DevTriggerSyncResponse;
+}

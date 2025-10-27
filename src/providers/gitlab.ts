@@ -3,9 +3,12 @@ import {
   Handler,
   WebhookEvent,
   WebhookContext,
+  WebhookSetupContext,
+  WebhookTeardownContext,
 } from "../common";
 import { BaseProvider, BaseProviderConfig } from "./base";
 import { GitLabApi } from "./gitlab/api";
+import { registerTrigger } from "../userCode/providers";
 
 export type GitlabConfig = BaseProviderConfig & {
   baseUrl?: string; // Allow custom GitLab instance URL
@@ -85,16 +88,20 @@ export class Gitlab extends BaseProvider {
         throw new Error("Either projectId or groupId must be provided");
       }
 
-      return {
+      const triggerInput = args.projectId
+        ? { projectId: args.projectId }
+        : { groupId: args.groupId };
+
+      return registerTrigger({
         type: "webhook",
         handler: args.handler,
         // Path will be auto-generated as /webhook/{uuid}
         method: "POST",
-        validation: async (event) => {
+        validation: async (event: WebhookEvent) => {
           // TODO: Implement GitLab webhook signature validation
           return true;
         },
-        setup: async (ctx) => {
+        setup: async (ctx: WebhookSetupContext) => {
           const api = this.getApi();
 
           try {
@@ -136,7 +143,7 @@ export class Gitlab extends BaseProvider {
             throw error;
           }
         },
-        teardown: async (ctx) => {
+        teardown: async (ctx: WebhookTeardownContext) => {
           const api = this.getApi();
           const webhookId = ctx.getMetadata("webhookId");
           const projectId = ctx.getMetadata("projectId");
@@ -164,7 +171,12 @@ export class Gitlab extends BaseProvider {
             // Don't throw - allow graceful shutdown even if cleanup fails
           }
         },
-      };
+      }, {
+        type: this.providerType,
+        alias: this.credentialName,
+        triggerType: "onMergeRequestComment",
+        input: triggerInput,
+      });
     },
   };
 }

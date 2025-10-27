@@ -6,6 +6,7 @@ async function getFetch() {
 import open from "open";
 import jwt from "jsonwebtoken";
 import { DeviceAuthResponse, StoredAuth, TokenResponse } from "./authTypes";
+import { logger } from "../utils/logger";
 
 function extractExpirationFromJWT(accessToken: string): number {
   try {
@@ -33,36 +34,43 @@ export class CLIAuth {
   }
 
   async login(): Promise<StoredAuth> {
-    console.log("🔐 Starting authentication...\n");
+    logger.info("Starting authentication...");
 
     // Step 1: Request device authorization (NO API KEY NEEDED)
-    const deviceAuth = await this.requestDeviceCode();
+    const deviceAuth = await logger.task(
+      "Requesting device authorization",
+      async () => {
+        return await this.requestDeviceCode();
+      },
+    );
 
     // Step 2: Display instructions to user
-    console.log("📱 Please visit this URL to authenticate:");
-    console.log(`   ${deviceAuth.verification_uri_complete}\n`);
-    console.log("   Or visit: " + deviceAuth.verification_uri);
-    console.log("   And enter code: " + deviceAuth.user_code + "\n");
+    logger.plain(
+      `📱 Please visit this URL to authenticate:\n   ${deviceAuth.verification_uri_complete}\n\n   Or visit: ${deviceAuth.verification_uri}\n   And enter code: ${deviceAuth.user_code}`,
+    );
 
     // Optionally open browser automatically
     try {
       await open(deviceAuth.verification_uri_complete);
-      console.log("✓ Browser opened automatically\n");
+      logger.success("Browser opened automatically");
     } catch (error) {
       // Silent fail if browser can't be opened
     }
 
-    console.log("⏳ Waiting for authorization...\n");
-
     // Step 3: Poll for tokens (NO API KEY NEEDED)
-    const tokens = await this.pollForTokens(
-      deviceAuth.device_code,
-      deviceAuth.interval,
-      deviceAuth.expires_in,
+    const tokens = await logger.task(
+      "Waiting for authorization",
+      async () => {
+        return await this.pollForTokens(
+          deviceAuth.device_code,
+          deviceAuth.interval,
+          deviceAuth.expires_in,
+        );
+      },
     );
 
-    console.log("✅ Successfully authenticated!");
-    console.log(`👤 Logged in as: ${tokens.user.email}\n`);
+    logger.success("Successfully authenticated!");
+    logger.plain(`👤 Logged in as: ${tokens.user.email}`);
 
     // Extract expiration time from JWT
     const expiresAt = extractExpirationFromJWT(tokens.access_token);

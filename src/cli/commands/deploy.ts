@@ -129,6 +129,14 @@ function convertTriggersToMetadata(triggers: any[]): any[] {
   return triggers.map((trigger: any) => {
     const metadata: any = { type: trigger.type };
 
+    // Add provider metadata if available (for provider-managed triggers)
+    if (trigger._providerMeta) {
+      metadata.provider_type = trigger._providerMeta.type;
+      metadata.provider_alias = trigger._providerMeta.alias;
+      metadata.trigger_type = trigger._providerMeta.triggerType;
+      metadata.input = trigger._providerMeta.input;
+    }
+
     if (trigger.type === "webhook") {
       // Only include path if explicitly set by user
       // Provider webhooks (without path) will get auto-generated UUID paths

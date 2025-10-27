@@ -2,11 +2,8 @@ import {
   intro,
   outro,
   text,
-  password,
   confirm,
   select,
-  multiselect,
-  spinner,
   isCancel,
   cancel,
 } from "@clack/prompts";
@@ -26,18 +23,23 @@ export async function setupUnavailableProviders(
     return;
   }
 
+  logger.warn(
+    `${unavailableProviders.length} provider(s) need configuration`
+  );
   intro("🔌 Provider Setup Required");
 
-  console.log(
-    `Found ${unavailableProviders.length} unavailable provider(s) that need to be configured:`
+  const providersList = unavailableProviders
+    .map(
+      (provider) =>
+        `  • ${provider.type}${
+          provider.alias ? ` (alias: ${provider.alias})` : ""
+        }`
+    )
+    .join("\n");
+
+  logger.plain(
+    `Found ${unavailableProviders.length} unavailable provider(s) that need to be configured:\n${providersList}`
   );
-  unavailableProviders.forEach((provider) => {
-    console.log(
-      `  • ${provider.type}${
-        provider.alias ? ` (alias: ${provider.alias})` : ""
-      }`
-    );
-  });
 
   const shouldContinue = await confirm({
     message: "Would you like to set up these providers now?",
@@ -55,16 +57,16 @@ export async function setupUnavailableProviders(
   }
 
   // Get available namespaces
-  const s = spinner();
-  s.start("Fetching namespaces...");
-  const namespaces = await fetchNamespaces();
-  s.stop("✅ Namespaces loaded");
+  const namespaces = await logger.task(
+    "Fetching namespaces",
+    async () => await fetchNamespaces()
+  );
 
   let selectedNamespaceId: string;
 
   if (namespaces.length === 1) {
     selectedNamespaceId = namespaces[0].id;
-    console.log(`Using namespace: ${namespaces[0].display_name}`);
+    logger.plain(`Using namespace: ${namespaces[0].id}`);
   } else {
     const namespaceChoice = await select({
       message: "Select a namespace for these providers:",
@@ -95,18 +97,20 @@ async function setupSingleProvider(
   provider: UsedProvider,
   namespaceId: string
 ): Promise<void> {
-  console.log(
+  logger.plain(
     `\n🔧 Setting up ${provider.type}${
       provider.alias ? ` (alias: ${provider.alias})` : ""
-    }...`
+    }`
   );
 
   try {
     // Fetch provider type configuration
-    const s = spinner();
-    s.start(`Fetching ${provider.type} configuration...`);
-    const providerType = await fetchProviderType(provider.type);
-    s.stop(`✅ ${provider.type} configuration loaded`);
+    const providerType = await logger.task(
+      `Fetching ${provider.type} configuration`,
+      async () => {
+        return await fetchProviderType(provider.type);
+      }
+    );
 
     // Collect configuration values
     const config: Record<string, any> = {};
@@ -117,17 +121,16 @@ async function setupSingleProvider(
     }
 
     // Create the provider
-    const createSpinner = spinner();
-    createSpinner.start("Creating provider...");
-
-    await createProvider({
-      namespace_id: namespaceId,
-      type: provider.type,
-      alias: provider.alias || provider.type,
-      config,
+    await logger.task("Creating provider", async () => {
+      await createProvider({
+        namespace_id: namespaceId,
+        type: provider.type,
+        alias: provider.alias || provider.type,
+        config,
+      });
     });
 
-    createSpinner.stop(`✅ ${provider.type} provider created successfully`);
+    logger.success(`${provider.type} provider created successfully`);
   } catch (error) {
     logger.error(`Failed to setup ${provider.type}`, error);
     throw error;
