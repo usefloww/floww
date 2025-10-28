@@ -37,7 +37,7 @@ export const CONFIG_SCHEMA = {
     cliKey: "backend-url",
   },
   websocketUrl: {
-    default: "ws://ws.flow.toondn.app/connection/websocket",
+    default: "wss://ws.flow.toondn.app/connection/websocket",
     envVar: "FLOWW_WEBSOCKET_URL",
     cliKey: "websocket-url",
   },

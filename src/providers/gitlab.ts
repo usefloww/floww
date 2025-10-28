@@ -74,8 +74,8 @@ export class Gitlab extends BaseProvider {
    */
   getApi(): GitLabApi {
     return new GitLabApi({
-      baseUrl: this.getBaseUrl(),
-      accessToken: this.getSecret("accessToken"),
+      baseUrl: "",
+      accessToken: "",
     });
   }
 
@@ -101,76 +101,8 @@ export class Gitlab extends BaseProvider {
           // TODO: Implement GitLab webhook signature validation
           return true;
         },
-        setup: async (ctx: WebhookSetupContext) => {
-          const api = this.getApi();
-
-          try {
-            let webhook;
-            if (args.projectId) {
-              webhook = await api.createProjectWebhook(args.projectId, {
-                url: ctx.webhookUrl,
-                note_events: true, // Enable merge request comments
-                merge_requests_events: true,
-              });
-              console.log(
-                `✅ GitLab webhook registered for project ${args.projectId}`
-              );
-
-              // Store metadata for teardown
-              ctx.setMetadata("webhookId", webhook.id);
-              ctx.setMetadata("projectId", args.projectId);
-            } else if (args.groupId) {
-              webhook = await api.createGroupWebhook(args.groupId, {
-                url: ctx.webhookUrl,
-                note_events: true,
-                merge_requests_events: true,
-              });
-              console.log(
-                `✅ GitLab webhook registered for group ${args.groupId}`
-              );
-
-              // Store metadata for teardown
-              ctx.setMetadata("webhookId", webhook.id);
-              ctx.setMetadata("groupId", args.groupId);
-            }
-            console.log(`   Webhook URL: ${ctx.webhookUrl}`);
-            console.log(`   Webhook ID: ${webhook?.id}`);
-          } catch (error: any) {
-            console.error(
-              "❌ Failed to register GitLab webhook:",
-              error.message
-            );
-            throw error;
-          }
-        },
-        teardown: async (ctx: WebhookTeardownContext) => {
-          const api = this.getApi();
-          const webhookId = ctx.getMetadata("webhookId");
-          const projectId = ctx.getMetadata("projectId");
-          const groupId = ctx.getMetadata("groupId");
-
-          if (!webhookId) {
-            console.log("⚠️  No webhook ID found, skipping cleanup");
-            return;
-          }
-
-          try {
-            if (projectId) {
-              await api.deleteProjectWebhook(projectId, webhookId);
-              console.log(
-                `🗑️  GitLab webhook ${webhookId} deleted from project ${projectId}`
-              );
-            } else if (groupId) {
-              await api.deleteGroupWebhook(groupId, webhookId);
-              console.log(
-                `🗑️  GitLab webhook ${webhookId} deleted from group ${groupId}`
-              );
-            }
-          } catch (error: any) {
-            console.error("❌ Failed to delete GitLab webhook:", error.message);
-            // Don't throw - allow graceful shutdown even if cleanup fails
-          }
-        },
+        setup: async (ctx: WebhookSetupContext) => {},
+        teardown: async (ctx: WebhookTeardownContext) => {},
       }, {
         type: this.providerType,
         alias: this.credentialName,

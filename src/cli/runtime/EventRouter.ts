@@ -35,7 +35,7 @@ export class EventRouter {
     port: number,
     host: string,
     private debugContext?: DebugContext,
-    workflowId?: string,
+    workflowId?: string
   ) {
     // Initialize event producers
     this.eventProducers = [
@@ -66,9 +66,7 @@ export class EventRouter {
       this.logTriggers(triggers);
     }
 
-    console.log(
-      `✅ Event routing started with ${triggers.length} trigger(s)`,
-    );
+    console.log(`✅ Event routing started with ${triggers.length} trigger(s)`);
   }
 
   /**
@@ -139,7 +137,7 @@ export class EventRouter {
         } else if (event.type === "realtime") {
           // Find matching realtime triggers
           const realtimeTriggers = this.currentTriggers.filter(
-            (t) => t.type === "realtime",
+            (t) => t.type === "realtime"
           ) as RealtimeTrigger[];
 
           for (const trigger of realtimeTriggers) {
@@ -156,7 +154,7 @@ export class EventRouter {
 
         // Single success log with all info
         logger.console.success(
-          `${event.type} ${eventInfo} → completed in ${executionTime}ms`,
+          `${event.type} ${eventInfo} → completed in ${executionTime}ms`
         );
 
         // Set flag to add separator before next execution
@@ -166,7 +164,7 @@ export class EventRouter {
 
         // Single error log with all info
         logger.console.error(
-          `${event.type} ${eventInfo} → failed after ${executionTime}ms`,
+          `${event.type} ${eventInfo} → failed after ${executionTime}ms`
         );
 
         if (this.debugContext) {
@@ -193,15 +191,17 @@ export class EventRouter {
     for (const trigger of triggers) {
       if (trigger.type === "webhook") {
         logger.console.debug(
-          `  📌 Webhook: ${(trigger as WebhookTrigger).method || "POST"} /webhook${(trigger as WebhookTrigger).path || ""}`,
+          `  📌 Webhook: ${
+            (trigger as WebhookTrigger).method || "POST"
+          } /webhook${(trigger as WebhookTrigger).path || ""}`
         );
       } else if (trigger.type === "cron") {
         logger.console.debug(
-          `  ⏰ Cron: ${(trigger as CronTrigger).expression}`,
+          `  ⏰ Cron: ${(trigger as CronTrigger).expression}`
         );
       } else if (trigger.type === "realtime") {
         logger.console.debug(
-          `  📡 Realtime: ${(trigger as RealtimeTrigger).channel}`,
+          `  📡 Realtime: ${(trigger as RealtimeTrigger).channel}`
         );
       }
     }

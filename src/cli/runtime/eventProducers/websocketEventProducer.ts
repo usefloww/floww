@@ -14,14 +14,14 @@ export class WebSocketEventProducer implements EventProducer {
 
   async updateTriggers(
     triggers: Trigger[],
-    stream: EventStream,
+    stream: EventStream
   ): Promise<void> {
     this.currentTriggers = triggers;
     this.currentStream = stream;
 
     // Filter realtime triggers
     const realtimeTriggers = triggers.filter(
-      (t) => t.type === "realtime",
+      (t) => t.type !== "cron"
     ) as RealtimeTrigger[];
 
     // Start connection if we have realtime triggers OR dev mode, and not already connected
@@ -36,7 +36,7 @@ export class WebSocketEventProducer implements EventProducer {
       const token = await getAuthToken();
       if (!token) {
         console.warn(
-          "No authentication token available for WebSocket connection",
+          "No authentication token available for WebSocket connection"
         );
         return;
       }
@@ -78,7 +78,8 @@ export class WebSocketEventProducer implements EventProducer {
 
     // Subscribe to realtime events channel
     const realtimeChannel = "workflow:events";
-    const realtimeSubscription = this.centrifuge.newSubscription(realtimeChannel);
+    const realtimeSubscription =
+      this.centrifuge.newSubscription(realtimeChannel);
 
     realtimeSubscription.on("publication", (ctx) => {
       const realtimeEvent: RealtimeEvent = {
@@ -109,20 +110,25 @@ export class WebSocketEventProducer implements EventProducer {
 
     // Subscribe to dev webhook channel if workflowId is provided
     if (this.workflowId) {
-      const devChannel = `dev:workflow:${this.workflowId}`;
+      const devChannel = `workflow:${this.workflowId}`;
       const devSubscription = this.centrifuge.newSubscription(devChannel);
 
       devSubscription.on("publication", (ctx) => {
+        console.log(ctx);
         if (ctx.data.type === "webhook") {
           // Match trigger by metadata
           const matchingTrigger = this.currentTriggers.find((t: any) => {
             if (!t._providerMeta || !ctx.data.trigger_metadata) return false;
 
             return (
-              t._providerMeta.type === ctx.data.trigger_metadata.provider_type &&
-              t._providerMeta.alias === ctx.data.trigger_metadata.provider_alias &&
-              t._providerMeta.triggerType === ctx.data.trigger_metadata.trigger_type &&
-              JSON.stringify(t._providerMeta.input) === JSON.stringify(ctx.data.trigger_metadata.input)
+              t._providerMeta.type ===
+                ctx.data.trigger_metadata.provider_type &&
+              t._providerMeta.alias ===
+                ctx.data.trigger_metadata.provider_alias &&
+              t._providerMeta.triggerType ===
+                ctx.data.trigger_metadata.trigger_type &&
+              JSON.stringify(t._providerMeta.input) ===
+                JSON.stringify(ctx.data.trigger_metadata.input)
             );
           });
 
