@@ -114,7 +114,6 @@ export class WebSocketEventProducer implements EventProducer {
       const devSubscription = this.centrifuge.newSubscription(devChannel);
 
       devSubscription.on("publication", (ctx) => {
-        console.log(ctx);
         if (ctx.data.type === "webhook") {
           // Match trigger by metadata
           const matchingTrigger = this.currentTriggers.find((t: any) => {
