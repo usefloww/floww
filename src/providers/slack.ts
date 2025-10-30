@@ -1,6 +1,13 @@
+import {
+  WebhookTrigger,
+  Handler,
+  WebhookEvent,
+  WebhookContext,
+} from "../common";
 import { BaseProvider, BaseProviderConfig } from "./base";
 import { SlackApi } from "./slack/api";
 import { Action } from "../common";
+import { registerTrigger } from "../userCode/providers";
 
 export type SlackConfig = BaseProviderConfig & {
   workspace_url?: string;
@@ -14,6 +21,30 @@ export type SendMessageArgs = {
   thread_ts?: string;
   reply_broadcast?: boolean;
   mrkdwn?: boolean;
+};
+
+// Slack Events API - Message Event
+// Reference: https://api.slack.com/events/message
+export type SlackMessageEvent = {
+  type: "event_callback";
+  team_id: string;
+  event: {
+    type: "message";
+    channel: string;
+    user: string;
+    text: string;
+    ts: string;
+    thread_ts?: string;
+    channel_type: "channel" | "group" | "im" | "mpim";
+    [key: string]: any;
+  };
+  event_time: number;
+};
+
+export type SlackOnMessageArgs = {
+  channelId?: string; // Optional: filter by specific channel
+  userId?: string; // Optional: filter by specific user
+  handler: Handler<WebhookEvent<SlackMessageEvent>, WebhookContext>;
 };
 
 class SlackActions {
@@ -130,5 +161,36 @@ export class Slack extends BaseProvider {
     return this.api;
   }
 
-  triggers = {};
+  triggers = {
+    /**
+     * Triggers when a message is posted to a Slack channel.
+     *
+     * The trigger is registered on the backend and filtering is handled server-side.
+     *
+     * @param args Configuration for the message trigger
+     * @param args.channelId Optional: Filter messages from a specific channel
+     * @param args.userId Optional: Filter messages from a specific user
+     * @param args.handler Function to handle incoming message events
+     */
+    onMessage: (
+      args: SlackOnMessageArgs
+    ): WebhookTrigger<SlackMessageEvent> => {
+      return registerTrigger(
+        {
+          type: "webhook",
+          handler: args.handler,
+          method: "POST",
+        },
+        {
+          type: this.providerType,
+          alias: this.credentialName,
+          triggerType: "onMessage",
+          input: {
+            channel_id: args.channelId,
+            user_id: args.userId,
+          },
+        }
+      );
+    },
+  };
 }

@@ -54,6 +54,7 @@ export class SlackApi {
   // Message operations
   async sendMessage(message: SlackMessage): Promise<any> {
     const result = await this.client.chat.postMessage({
+      channel: message.channel,
       text: message.text,
       blocks: message.blocks,
       attachments: message.attachments,
