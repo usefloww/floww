@@ -140,8 +140,8 @@ export async function listNamespacesCommand() {
       }
 
       table.push([
-        chalk.white(namespace.name),
-        chalk.cyan(namespace.display_name || namespace.name),
+        chalk.white(namespace.organization?.name || 'personal'),
+        chalk.cyan(namespace.organization?.display_name || 'Personal'),
         chalk.dim(namespace.id.substring(0, 8)),
         owner,
       ]);

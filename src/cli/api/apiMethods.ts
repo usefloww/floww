@@ -10,10 +10,13 @@ async function getFetch() {
 // Type definitions for API responses
 export interface Namespace {
   id: string;
-  name: string;
-  display_name: string;
   user_owner_id?: string;
   organization_owner_id?: string;
+  organization?: {
+    id: string;
+    name: string;
+    display_name: string;
+  };
 }
 
 export interface Workflow {
