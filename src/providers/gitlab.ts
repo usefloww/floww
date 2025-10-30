@@ -49,34 +49,8 @@ export type GitLabMergeRequestCommentTriggerArgs = {
 export class Gitlab extends BaseProvider {
   providerType = "gitlab";
 
-  secretDefinitions = [
-    {
-      key: "accessToken",
-      label: "GitLab Access Token",
-      type: "password" as const,
-      required: true,
-    },
-  ];
-
-  constructor(config?: GitlabConfig | string) {
+  constructor(config: any) {
     super(config);
-  }
-
-  private getBaseUrl(): string {
-    return (
-      this.getConfig<string>("baseUrl", "https://gitlab.com") ||
-      "https://gitlab.com"
-    );
-  }
-
-  /**
-   * Get a configured GitLab API client
-   */
-  getApi(): GitLabApi {
-    return new GitLabApi({
-      baseUrl: "",
-      accessToken: "",
-    });
   }
 
   actions = {};

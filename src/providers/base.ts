@@ -10,7 +10,7 @@ export abstract class BaseProvider implements Provider {
   credentialName: string;
   secretDefinitions?: SecretDefinition[];
   abstract triggers: Record<string, (...args: any[]) => Trigger>;
-  abstract actions: Record<string, (...args: any[]) => Action>;
+  abstract actions: any;
 
   protected config: Record<string, any> = {};
   private secrets: Record<string, string> = {};
@@ -37,7 +37,7 @@ export abstract class BaseProvider implements Provider {
     const value = this.secrets[key];
     if (!value) {
       throw new Error(
-        `${this.providerType} credential '${this.credentialName}' not configured. Missing secret: ${key}`,
+        `${this.providerType} credential '${this.credentialName}' not configured. Missing secret: ${key}`
       );
     }
     return value;
