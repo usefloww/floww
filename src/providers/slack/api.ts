@@ -229,6 +229,35 @@ export class SlackApi {
     return result;
   }
 
+  // Conversation history
+  async getConversationHistory(
+    channel: string,
+    options?: {
+      cursor?: string;
+      inclusive?: boolean;
+      latest?: string;
+      limit?: number;
+      oldest?: string;
+      include_all_metadata?: boolean;
+    }
+  ): Promise<any> {
+    const result = await this.client.conversations.history({
+      channel,
+      cursor: options?.cursor,
+      inclusive: options?.inclusive,
+      latest: options?.latest,
+      limit: options?.limit,
+      oldest: options?.oldest,
+      include_all_metadata: options?.include_all_metadata,
+    });
+
+    if (!result.ok) {
+      throw new Error(`Slack API error: ${result.error}`);
+    }
+
+    return result;
+  }
+
   // Auth test
   async test(): Promise<any> {
     const result = await this.client.auth.test();

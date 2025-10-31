@@ -141,6 +141,26 @@ class SlackActions {
     const api = this.getApi();
     return await api.getUser(args.userId);
   }
+
+  async conversationHistory(args: {
+    channelId: string;
+    cursor?: string;
+    inclusive?: boolean;
+    latest?: string;
+    limit?: number;
+    oldest?: string;
+    include_all_metadata?: boolean;
+  }): Promise<any> {
+    const api = this.getApi();
+    return await api.getConversationHistory(args.channelId, {
+      cursor: args.cursor,
+      inclusive: args.inclusive,
+      latest: args.latest,
+      limit: args.limit,
+      oldest: args.oldest,
+      include_all_metadata: args.include_all_metadata,
+    });
+  }
 }
 
 export class Slack extends BaseProvider {

@@ -148,7 +148,7 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
 
-  examples/4_slack:
+  examples/5_slack:
     devDependencies:
       tsx:
         specifier: ^4.19.2

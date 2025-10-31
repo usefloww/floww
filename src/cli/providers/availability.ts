@@ -19,10 +19,11 @@ export async function checkProviderAvailability(
     // Fetch existing providers from API
     const existingProviders = await fetchProviders();
 
-    // Create a map of existing providers by type and alias
+    // Create a map of existing providers by type:alias
     const existingMap = new Map<string, Provider>();
     existingProviders.forEach((provider) => {
-      existingMap.set(provider.alias, provider);
+      const key = `${provider.type}:${provider.alias}`;
+      existingMap.set(key, provider);
     });
 
     const available: UsedProvider[] = [];
@@ -30,19 +31,12 @@ export async function checkProviderAvailability(
 
     // Check each used provider
     usedProviders.forEach((used) => {
-      const key = used.alias || used.type;
+      const key = `${used.type}:${used.alias || "default"}`;
 
       if (used.type == "builtin") {
         available.push(used);
       } else if (existingMap.has(key)) {
-        const existing = existingMap.get(key)!;
-        // Verify type matches
-        if (existing.type === used.type) {
-          available.push(used);
-        } else {
-          // Alias exists but type doesn't match - treat as unavailable
-          unavailable.push(used);
-        }
+        available.push(used);
       } else {
         unavailable.push(used);
       }

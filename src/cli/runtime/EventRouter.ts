@@ -162,10 +162,14 @@ export class EventRouter {
       } catch (error) {
         const executionTime = Date.now() - startTime;
 
-        // Single error log with all info
+        // Get error message for display
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Single error log with all info including error message
         logger.console.error(
           `${event.type} ${eventInfo} → failed after ${executionTime}ms`
         );
+        logger.console.error(`  ↳ ${errorMessage}`);
 
         if (this.debugContext) {
           this.debugContext.reportError(error, {
