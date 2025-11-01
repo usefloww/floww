@@ -90,8 +90,11 @@ jobs:
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "Generated version: $NEW_VERSION"
 
-      - name: Publish to GitHub Package Registry
-        run: pnpm publish --access public --no-git-checks
+      - name: Set publishing config
+        run: pnpm config set '//npm.pkg.github.com/:_authToken' "${NODE_AUTH_TOKEN}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
+
+      - name: Publish to GitHub Package Registry
+        run: pnpm publish --access public --no-git-checks
 
