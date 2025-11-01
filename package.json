@@ -1,20 +1,17 @@
 {
-  "name": "@DeveloperFlows/floww-sdk",
-  "version": "1.0.0",
+  "name": "floww",
+  "version": "0.0.1",
   "description": "SDK for building trigger-based workflows",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DeveloperFlows/floww-sdk.git"
   },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "bin": {
-    "floww": "./dist/cli.js"
+    "floww": "dist/cli.js"
   },
   "exports": {
     ".": {
@@ -57,7 +54,6 @@
   "license": "ISC",
   "packageManager": "pnpm@10.9.0",
   "dependencies": {
-    "@DeveloperFlows/floww-sdk": "link:",
     "@ai-sdk/anthropic": "^2.0.39",
     "@ai-sdk/google": "^2.0.25",
     "@ai-sdk/openai": "^2.0.58",
@@ -100,5 +96,13 @@
   },
   "peerDependencies": {
     "typescript": ">=5.0.0"
-  }
+  },
+  "directories": {
+    "example": "examples",
+    "test": "tests"
+  },
+  "bugs": {
+    "url": "https://github.com/DeveloperFlows/floww-sdk/issues"
+  },
+  "homepage": "https://github.com/DeveloperFlows/floww-sdk#readme"
 }
