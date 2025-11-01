@@ -124,8 +124,19 @@ jobs:
       - name: Build package
         run: pnpm run build
 
-      - name: Publish to npm
-        run: pnpm publish --access public --no-git-checks
+      - name: Check if version exists and publish
+        run: |
+          PACKAGE_VERSION=$(jq -r '.version' package.json)
+          echo "Package version: $PACKAGE_VERSION"
+
+          # Check if this version already exists on npm
+          if npm view floww@$PACKAGE_VERSION version 2>/dev/null; then
+            echo "Version $PACKAGE_VERSION already published to npm, skipping publish"
+            exit 0
+          fi
+
+          echo "Publishing version $PACKAGE_VERSION to npm"
+          pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
