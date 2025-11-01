@@ -100,7 +100,7 @@ function injectProviderConfigs(
 
   // Create wrapper code
   const wrapperCode = `
-    // Import auto-registration functions first
+    // Import auto-registration functions from floww package
     const { getUsedProviders, getRegisteredTriggers, clearRegisteredTriggers, clearUsedProviders, setProviderConfigs } = require('floww');
 
     // Clear previously registered data to prevent duplication on reload

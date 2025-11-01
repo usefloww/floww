@@ -22,7 +22,12 @@ export class Builtin extends BaseProvider {
         expression: args.expression,
         handler: args.handler,
       } as CronTrigger;
-      return registerTrigger(trigger);
+      return registerTrigger(trigger, {
+        type: this.providerType,
+        alias: this.credentialName,
+        triggerType: "onCron",
+        input: { expression: args.expression },
+      });
     },
     onWebhook: <TBody = any>(
       args: WebhookTriggerArgs<TBody>,
@@ -35,7 +40,12 @@ export class Builtin extends BaseProvider {
         setup: args.setup,
         teardown: args.teardown,
       } as WebhookTrigger<TBody>;
-      return registerTrigger(trigger);
+      return registerTrigger(trigger, {
+        type: this.providerType,
+        alias: this.credentialName,
+        triggerType: "onWebhook",
+        input: { path: args.path, method: args.method || "POST" },
+      });
     },
   };
 }

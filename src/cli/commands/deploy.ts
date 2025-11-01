@@ -329,7 +329,7 @@ export async function deployCommand() {
         `
         pnpm install &&
         pnpm build &&
-        node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); delete pkg.dependencies['floww']; fs.writeFileSync('package.json',JSON.stringify(pkg,null,2));" &&
+        node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); delete pkg.dependencies['@DeveloperFlows/floww-sdk']; delete pkg.dependencies['floww']; fs.writeFileSync('package.json',JSON.stringify(pkg,null,2));" &&
         pnpm pack --pack-destination ./ &&
         git checkout package.json
       `,

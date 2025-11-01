@@ -3,6 +3,7 @@ import ts from "typescript";
 import { createRequire } from "module";
 import { VirtualFileSystem } from "./VirtualFileSystem";
 import { DebugContext } from "../cli/debug/debugContext";
+import * as SDK from "../index";
 
 export interface TranspileResult {
   code: string;
@@ -38,19 +39,20 @@ export class ModuleSystem {
           const req = createRequire(process.cwd() + "/package.json");
           return req(specifier);
         } catch (e) {
-          // Handle case-insensitive SDK package name and subpaths
-          if (specifier.toLowerCase().startsWith("floww")) {
-            try {
-              const req = createRequire(process.cwd() + "/package.json");
-              // Replace the package name while preserving the subpath
-              const correctedSpecifier = specifier.replace(
-                /^@developerflows\/floww-sdk/i,
-                "floww"
-              );
-              return req(correctedSpecifier);
-            } catch (e2) {
-              // Fall through to VFS resolution
+          // Handle floww package - return SDK directly when running from source
+          const sdkMatch = specifier.match(/^floww(?:\/(.+))?$/i);
+          if (sdkMatch) {
+            const subpath = sdkMatch[1];
+            if (subpath) {
+              const exportKey = subpath.replace(/\/+/g, ".");
+              const exportValue = exportKey
+                .split(".")
+                .reduce<any>((acc, key) => (acc ? acc[key] : undefined), SDK);
+              if (exportValue) {
+                return exportValue;
+              }
             }
+            return SDK;
           }
           // Not a built-in, try user modules
         }
