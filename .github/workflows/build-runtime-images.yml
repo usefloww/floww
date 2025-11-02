@@ -1,0 +1,68 @@
+name: Build and Push Runtime Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'runtime-images/**'
+      - '.github/workflows/build-runtime-images.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version from package.json
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Lambda runtime image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./runtime-images/lambda/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ vars.DOCKER_REPOSITORY }}:lambda-${{ steps.version.outputs.VERSION }}
+            ${{ vars.DOCKER_REPOSITORY }}:lambda-latest
+          provenance: false
+
+      - name: Build and push Docker runtime image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./runtime-images/docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ vars.DOCKER_REPOSITORY }}:docker-${{ steps.version.outputs.VERSION }}
+            ${{ vars.DOCKER_REPOSITORY }}:docker-latest
+          provenance: false
+
+      - name: Summary
+        run: |
+          echo "✅ Successfully built and pushed runtime images:"
+          echo "  - ${{ vars.DOCKER_REPOSITORY }}:lambda-${{ steps.version.outputs.VERSION }}"
+          echo "  - ${{ vars.DOCKER_REPOSITORY }}:lambda-latest"
+          echo "  - ${{ vars.DOCKER_REPOSITORY }}:docker-${{ steps.version.outputs.VERSION }}"
+          echo "  - ${{ vars.DOCKER_REPOSITORY }}:docker-latest"

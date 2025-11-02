@@ -7,8 +7,8 @@
     "type": "git",
     "url": "git+https://github.com/usefloww/floww-sdk.git"
   },
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "floww": "dist/cli.js"
@@ -16,13 +16,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./ai": {
       "types": "./dist/ai/index.d.ts",
-      "import": "./dist/ai/index.mjs",
-      "require": "./dist/ai/index.js"
+      "import": "./dist/ai/index.js",
+      "require": "./dist/ai/index.cjs"
     }
   },
   "files": [

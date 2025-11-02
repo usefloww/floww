@@ -1,0 +1,6 @@
+build:
+    #!/bin/bash
+    set -euo pipefail
+    # Build Docker image for x86_64 (Lambda architecture)
+    docker build --platform=linux/amd64 --provenance=false -f {{justfile_directory()}}/Dockerfile -t base-floww {{justfile_directory()}}/../../
+

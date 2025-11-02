@@ -1,0 +1,18 @@
+build:
+    #!/bin/bash
+    set -euo pipefail
+    # Build Docker image for multi-platform support
+    docker build --platform=linux/amd64 --provenance=false -f {{justfile_directory()}}/Dockerfile -t floww-docker-runtime {{justfile_directory()}}/../../
+
+run:
+    #!/bin/bash
+    set -euo pipefail
+    # Run the Docker container locally for testing
+    docker run --rm -p 8000:8000 floww-docker-runtime
+
+test:
+    #!/bin/bash
+    set -euo pipefail
+    # Test the health endpoint
+    echo "Testing health endpoint..."
+    curl -f http://localhost:8000/health || echo "Container not running or health check failed"
