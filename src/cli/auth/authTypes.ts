@@ -11,8 +11,10 @@ export interface TokenResponse {
   access_token: string;
   refresh_token?: string;
   token_type: string;
-  expires_in?: number; // Optional because WorkOS might not always return it
-  user: {
+  expires_in?: number;
+  // User field is optional - standard OIDC token endpoints don't return user info
+  // User data is fetched separately from /whoami endpoint after authentication
+  user?: {
     id: string;
     email: string;
     first_name?: string;

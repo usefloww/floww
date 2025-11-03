@@ -6,7 +6,9 @@ async function getFetch() {
 import open from "open";
 import jwt from "jsonwebtoken";
 import { DeviceAuthResponse, StoredAuth, TokenResponse } from "./authTypes";
+import { BackendConfig } from "../config/backendConfig";
 import { logger } from "../utils/logger";
+import { getConfigValue } from "../config/configUtils";
 
 function extractExpirationFromJWT(accessToken: string): number {
   try {
@@ -26,11 +28,10 @@ function extractExpirationFromJWT(accessToken: string): number {
 }
 
 export class CLIAuth {
-  private clientId: string;
-  private apiUrl = "https://api.workos.com";
+  private config: BackendConfig;
 
-  constructor(clientId: string) {
-    this.clientId = clientId;
+  constructor(config: BackendConfig) {
+    this.config = config;
   }
 
   async login(): Promise<StoredAuth> {
@@ -41,12 +42,12 @@ export class CLIAuth {
       "Requesting device authorization",
       async () => {
         return await this.requestDeviceCode();
-      },
+      }
     );
 
     // Step 2: Display instructions to user
     logger.plain(
-      `📱 Please visit this URL to authenticate:\n   ${deviceAuth.verification_uri_complete}\n\n   Or visit: ${deviceAuth.verification_uri}\n   And enter code: ${deviceAuth.user_code}`,
+      `📱 Please visit this URL to authenticate:\n   ${deviceAuth.verification_uri_complete}\n\n   Or visit: ${deviceAuth.verification_uri}\n   And enter code: ${deviceAuth.user_code}`
     );
 
     // Optionally open browser automatically
@@ -58,19 +59,19 @@ export class CLIAuth {
     }
 
     // Step 3: Poll for tokens (NO API KEY NEEDED)
-    const tokens = await logger.task(
-      "Waiting for authorization",
-      async () => {
-        return await this.pollForTokens(
-          deviceAuth.device_code,
-          deviceAuth.interval,
-          deviceAuth.expires_in,
-        );
-      },
-    );
+    const tokens = await logger.task("Waiting for authorization", async () => {
+      return await this.pollForTokens(
+        deviceAuth.device_code,
+        deviceAuth.interval,
+        deviceAuth.expires_in
+      );
+    });
 
     logger.success("Successfully authenticated!");
-    logger.plain(`👤 Logged in as: ${tokens.user.email}`);
+
+    // Step 4: Fetch user info from /whoami endpoint
+    const user = await this.fetchUserInfo(tokens.access_token);
+    logger.plain(`👤 Logged in as: ${user.email}`);
 
     // Extract expiration time from JWT
     const expiresAt = extractExpirationFromJWT(tokens.access_token);
@@ -78,24 +79,28 @@ export class CLIAuth {
     return {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
-      user: tokens.user,
+      user,
       expiresAt,
     };
   }
 
   private async requestDeviceCode(): Promise<DeviceAuthResponse> {
+    if (!this.config.auth.device_authorization_endpoint) {
+      throw new Error("Device authorization endpoint not configured");
+    }
+
     const fetch = await getFetch();
     const response = await fetch(
-      `${this.apiUrl}/user_management/authorize/device`,
+      this.config.auth.device_authorization_endpoint,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body: new URLSearchParams({
-          client_id: this.clientId,
+          client_id: this.config.auth.client_id,
         }),
-      },
+      }
     );
 
     if (!response.ok) {
@@ -109,8 +114,12 @@ export class CLIAuth {
   private async pollForTokens(
     deviceCode: string,
     interval: number,
-    expiresIn: number,
+    expiresIn: number
   ): Promise<TokenResponse> {
+    if (!this.config.auth.token_endpoint) {
+      throw new Error("Token endpoint not configured");
+    }
+
     const startTime = Date.now();
     const expirationTime = startTime + expiresIn * 1000;
     let pollInterval = interval;
@@ -120,20 +129,17 @@ export class CLIAuth {
 
       try {
         const fetch = await getFetch();
-        const response = await fetch(
-          `${this.apiUrl}/user_management/authenticate`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              client_id: this.clientId,
-              device_code: deviceCode,
-              grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-            }),
+        const response = await fetch(this.config.auth.token_endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
           },
-        );
+          body: new URLSearchParams({
+            client_id: this.config.auth.client_id,
+            device_code: deviceCode,
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+          }),
+        });
 
         if (response.ok) {
           return (await response.json()) as TokenResponse;
@@ -155,7 +161,7 @@ export class CLIAuth {
           throw new Error(
             error.error === "expired_token"
               ? "Authorization expired. Please try again."
-              : "Authorization denied.",
+              : "Authorization denied."
           );
         } else {
           // Unknown error, continue polling
@@ -174,21 +180,22 @@ export class CLIAuth {
   }
 
   async refreshAccessToken(refreshToken: string): Promise<StoredAuth> {
+    if (!this.config.auth.token_endpoint) {
+      throw new Error("Token endpoint not configured");
+    }
+
     const fetch = await getFetch();
-    const response = await fetch(
-      `${this.apiUrl}/user_management/authenticate`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          client_id: this.clientId,
-          refresh_token: refreshToken,
-          grant_type: "refresh_token",
-        }),
+    const response = await fetch(this.config.auth.token_endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-    );
+      body: new URLSearchParams({
+        client_id: this.config.auth.client_id,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      }),
+    });
 
     if (!response.ok) {
       throw new Error("Failed to refresh token");
@@ -196,15 +203,38 @@ export class CLIAuth {
 
     const tokens = (await response.json()) as TokenResponse;
 
+    // Fetch user info from /whoami endpoint
+    const user = await this.fetchUserInfo(tokens.access_token);
+
     // Extract expiration time from JWT
     const expiresAt = extractExpirationFromJWT(tokens.access_token);
 
     return {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
-      user: tokens.user,
+      user,
       expiresAt,
     };
+  }
+
+  private async fetchUserInfo(accessToken: string): Promise<any> {
+    const fetch = await getFetch();
+
+    const backendUrl = getConfigValue("backendUrl");
+    const whoamiUrl = `${backendUrl}/api/whoami`;
+
+    const response = await fetch(whoamiUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user info: ${response.statusText}`);
+    }
+
+    return await response.json();
   }
 
   private sleep(ms: number): Promise<void> {

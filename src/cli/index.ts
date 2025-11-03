@@ -46,29 +46,29 @@ program
   .description("Run triggers in development mode with auto-reload")
   .argument(
     "[file]",
-    "Path to the triggers file (defaults to entrypoint from floww.yaml)",
+    "Path to the triggers file (defaults to entrypoint from floww.yaml)"
   )
   .option("-p, --port <port>", "Port for webhook server", "3000")
   .option("-h, --host <host>", "Host for webhook server", "localhost")
   .option(
     "--debug",
-    "Enable debugging mode with enhanced logging and inspector",
+    "Enable debugging mode with enhanced logging and inspector"
   )
   .option(
     "--debug-port <port>",
     "Inspector port for debugging (default: 9229)",
-    "9229",
+    "9229"
   )
   .action(devCommand);
 
 program
   .command("deploy")
   .description(
-    "Deploy triggers to the server (uses entrypoint from floww.yaml)",
+    "Deploy triggers to the server (uses entrypoint from floww.yaml)"
   )
   .action(deployCommand);
 
-program.command("login").description("Login").action(loginCommand);
+program.command("login").description("Login to Floww").action(loginCommand);
 
 program.command("logout").description("Logout").action(logoutCommand);
 

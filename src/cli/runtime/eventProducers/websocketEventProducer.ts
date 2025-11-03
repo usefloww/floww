@@ -2,6 +2,7 @@ import { Centrifuge } from "centrifuge";
 import { RealtimeEvent, Trigger, RealtimeTrigger } from "../../../common";
 import { EventProducer, EventStream } from "../types";
 import { getAuthToken } from "../../auth/tokenUtils";
+import { loadActiveProfile } from "../../auth/authUtils";
 import { getConfig } from "../../config/configUtils";
 
 export class WebSocketEventProducer implements EventProducer {
@@ -41,11 +42,19 @@ export class WebSocketEventProducer implements EventProducer {
         return;
       }
 
-      // Get WebSocket URL from config
-      const config = getConfig();
+      // Get WebSocket URL from profile or fallback to config
+      const profile = loadActiveProfile();
+      let websocketUrl: string;
+
+      if (profile) {
+        websocketUrl = profile.config.websocket_url;
+      } else {
+        const config = getConfig();
+        websocketUrl = config.websocketUrl;
+      }
 
       // Create Centrifuge client with authentication headers
-      this.centrifuge = new Centrifuge(config.websocketUrl, {
+      this.centrifuge = new Centrifuge(websocketUrl, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

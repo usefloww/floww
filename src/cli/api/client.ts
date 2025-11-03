@@ -4,6 +4,7 @@ async function getFetch() {
   return fetch;
 }
 import { getValidAuth } from "../auth/tokenUtils";
+import { loadActiveProfile } from "../auth/authUtils";
 import { getConfig } from "../config/configUtils";
 import { FlowwConfig } from "../config/configTypes";
 
@@ -112,9 +113,15 @@ export class ApiClient {
 }
 
 /**
- * Create API client with config system
+ * Create API client with profile or fallback to config system
  */
 function createApiClient(): ApiClient {
+  const profile = loadActiveProfile();
+
+  if (profile) {
+    return new ApiClient(profile.backendUrl, profile.config.auth.client_id);
+  }
+
   const config = getConfig();
   return new ApiClient(config.backendUrl, config.workosClientId);
 }

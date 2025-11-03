@@ -9,12 +9,18 @@ on:
       - '.github/workflows/build-runtime-images.yml'
   workflow_dispatch:
 
-permissions:
-  contents: read
+env:
+  REGISTRY: ghcr.io
+  LAMBDA_IMAGE_NAME: usefloww/lambda-runtime
+  DOCKER_IMAGE_NAME: usefloww/docker-runtime
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,11 +35,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Lambda runtime image
         uses: docker/build-push-action@v5
@@ -43,8 +50,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ vars.DOCKER_REPOSITORY }}:lambda-${{ steps.version.outputs.VERSION }}
-            ${{ vars.DOCKER_REPOSITORY }}:lambda-latest
+            ${{ env.REGISTRY }}/${{ env.LAMBDA_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.LAMBDA_IMAGE_NAME }}:latest
           provenance: false
 
       - name: Build and push Docker runtime image
@@ -55,14 +62,14 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ vars.DOCKER_REPOSITORY }}:docker-${{ steps.version.outputs.VERSION }}
-            ${{ vars.DOCKER_REPOSITORY }}:docker-latest
+            ${{ env.REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
           provenance: false
 
       - name: Summary
         run: |
           echo "✅ Successfully built and pushed runtime images:"
-          echo "  - ${{ vars.DOCKER_REPOSITORY }}:lambda-${{ steps.version.outputs.VERSION }}"
-          echo "  - ${{ vars.DOCKER_REPOSITORY }}:lambda-latest"
-          echo "  - ${{ vars.DOCKER_REPOSITORY }}:docker-${{ steps.version.outputs.VERSION }}"
-          echo "  - ${{ vars.DOCKER_REPOSITORY }}:docker-latest"
+          echo "  - ${{ env.REGISTRY }}/${{ env.LAMBDA_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}"
+          echo "  - ${{ env.REGISTRY }}/${{ env.LAMBDA_IMAGE_NAME }}:latest"
+          echo "  - ${{ env.REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}"
+          echo "  - ${{ env.REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest"
