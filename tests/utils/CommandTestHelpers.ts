@@ -39,7 +39,7 @@ interface BackgroundCommand {
 export function waitUntilStdout(
   command: BackgroundCommand,
   pattern: string,
-  timeout = 5000
+  timeout = 2000
 ) {
   return new Promise((resolve, reject) => {
     // Capture the original call stack

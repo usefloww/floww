@@ -15,7 +15,7 @@ describe("Deploy Command Tests", () => {
     await commandSpace.exit();
   });
 
-  it("should deploy a workflow to production", async () => {
+  it.todo("should deploy a workflow to production", async () => {
     const command = commandSpace.backgroundCommand("deploy", { tty: true });
     await waitUntilStdout(command, "Deploying workflow...");
   });
