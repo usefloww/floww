@@ -1,3 +1,9 @@
+import type { KVStore } from './kv';
+
+export type BaseContext = {
+  kv: KVStore;
+};
+
 export type Handler<TEvent = any, TContext = any> = (
   ctx: TContext,
   event: TEvent,
@@ -16,9 +22,10 @@ export type WebhookEvent<TBody = any> = {
   query: Record<string, string>;
   method: string;
   path: string;
+  auth_token?: string; // Short-lived JWT for workflow-to-backend authentication
 };
 
-export type WebhookContext = {
+export type WebhookContext = BaseContext & {
   // Add webhook-specific context utilities here
   // e.g., respond, setStatus, etc.
 };
@@ -61,7 +68,7 @@ export type CronEvent = {
   actualTime: Date;
 };
 
-export type CronContext = {
+export type CronContext = BaseContext & {
   // Add cron-specific context utilities here
 };
 
@@ -98,7 +105,7 @@ export type RealtimeEvent<TPayload = any> = {
   channel: string;
 };
 
-export type RealtimeContext = {
+export type RealtimeContext = BaseContext & {
   // Add realtime-specific context utilities here
   // e.g., send response, get channel info, etc.
 };

@@ -11,5 +11,8 @@ export * from "./providers/ai";
 // Code execution exports
 export * from "./codeExecution";
 
+// KV Store exports
+export * from "./kv";
+
 // AI utilities namespace
 export * as ai from "./ai";

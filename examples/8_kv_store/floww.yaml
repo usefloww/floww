@@ -1,0 +1,4 @@
+workflowId: 023b1c97-36f6-48fe-af77-a172153d5d24
+name: kv-store-example
+version: 1.0.0
+entrypoint: main.ts

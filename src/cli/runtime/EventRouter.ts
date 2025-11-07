@@ -3,6 +3,9 @@ import {
   WebhookTrigger,
   CronTrigger,
   RealtimeTrigger,
+  WebhookContext,
+  CronContext,
+  RealtimeContext,
 } from "../../common";
 import { EventStream, EventProducer } from "./types";
 import { WebhookEventProducer } from "./eventProducers/webhookEventProducer";
@@ -10,6 +13,8 @@ import { CronEventProducer } from "./eventProducers/cronEventProducer";
 import { WebSocketEventProducer } from "./eventProducers/websocketEventProducer";
 import { DebugContext } from "@/codeExecution";
 import { logger } from "../utils/logger";
+import { KVStore } from "../../kv";
+import { getConfig } from "../config/configUtils";
 
 /**
  * Setup event routing to userspace (websocket + local events).
@@ -102,6 +107,15 @@ export class EventRouter {
   }
 
   /**
+   * Create context object with KV store
+   */
+  private createContext(authToken?: string): WebhookContext | CronContext | RealtimeContext {
+    const config = getConfig();
+    const kv = new KVStore(config.backendUrl, authToken || '');
+    return { kv };
+  }
+
+  /**
    * Setup event routing handlers
    *
    * Routes incoming events from producers to matching trigger handlers.
@@ -133,7 +147,8 @@ export class EventRouter {
       try {
         if (event.trigger) {
           // Direct trigger provided (webhook/cron)
-          await event.trigger.handler({}, event.data);
+          const ctx = this.createContext(event.data?.auth_token);
+          await event.trigger.handler(ctx, event.data);
         } else if (event.type === "realtime") {
           // Find matching realtime triggers
           const realtimeTriggers = this.currentTriggers.filter(
@@ -145,7 +160,8 @@ export class EventRouter {
               trigger.channel === event.data.channel &&
               (!trigger.messageType || trigger.messageType === event.data.type)
             ) {
-              await trigger.handler({}, event.data);
+              const ctx = this.createContext(event.data?.auth_token);
+              await trigger.handler(ctx, event.data);
             }
           }
         }
