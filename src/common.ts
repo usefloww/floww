@@ -1,5 +1,9 @@
 import type { KVStore } from './kv';
 
+// Export ExecutionContext for use by services
+export { ExecutionContext } from './cli/runtime/ExecutionContext';
+export type { ExecutionContextData } from './cli/runtime/ExecutionContext';
+
 export type BaseContext = {
   kv: KVStore;
 };
@@ -103,6 +107,7 @@ export type RealtimeEvent<TPayload = any> = {
   payload: TPayload;
   timestamp: string;
   channel: string;
+  auth_token?: string; // Short-lived JWT for workflow-to-backend authentication
 };
 
 export type RealtimeContext = BaseContext & {

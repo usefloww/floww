@@ -97,6 +97,7 @@ export class WebSocketEventProducer implements EventProducer {
         payload: ctx.data.payload || ctx.data,
         timestamp: new Date().toISOString(),
         channel: ctx.data.channel || realtimeChannel,
+        auth_token: ctx.data.auth_token, // Pass through workflow auth token from backend
       };
 
       // Just emit the event - let the engine route it to the right triggers
@@ -151,6 +152,7 @@ export class WebSocketEventProducer implements EventProducer {
                 query: ctx.data.query,
                 method: ctx.data.method,
                 path: ctx.data.path,
+                auth_token: ctx.data.auth_token, // Pass through workflow auth token from backend
               },
             });
           } else {

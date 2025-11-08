@@ -15,6 +15,8 @@ import { DebugContext } from "@/codeExecution";
 import { logger } from "../utils/logger";
 import { KVStore } from "../../kv";
 import { getConfig } from "../config/configUtils";
+import { ExecutionContext } from "./ExecutionContext";
+import { getAuthToken } from "../auth/tokenUtils";
 
 /**
  * Setup event routing to userspace (websocket + local events).
@@ -108,10 +110,21 @@ export class EventRouter {
 
   /**
    * Create context object with KV store
+   * Extracts execution context from event data and passes to services
    */
-  private createContext(authToken?: string): WebhookContext | CronContext | RealtimeContext {
+  private async createContext(event?: any): Promise<WebhookContext | CronContext | RealtimeContext> {
     const config = getConfig();
-    const kv = new KVStore(config.backendUrl, authToken || '');
+    const executionContext = ExecutionContext.fromEvent(event);
+
+    // If no workflow auth token from event, use CLI user's token as fallback (for dev mode)
+    if (!executionContext.getAuthToken()) {
+      const cliToken = await getAuthToken();
+      if (cliToken) {
+        executionContext.setAuthToken(cliToken);
+      }
+    }
+
+    const kv = new KVStore(config.backendUrl, executionContext);
     return { kv };
   }
 
@@ -147,7 +160,7 @@ export class EventRouter {
       try {
         if (event.trigger) {
           // Direct trigger provided (webhook/cron)
-          const ctx = this.createContext(event.data?.auth_token);
+          const ctx = await this.createContext(event.data);
           await event.trigger.handler(ctx, event.data);
         } else if (event.type === "realtime") {
           // Find matching realtime triggers
@@ -160,7 +173,7 @@ export class EventRouter {
               trigger.channel === event.data.channel &&
               (!trigger.messageType || trigger.messageType === event.data.type)
             ) {
-              const ctx = this.createContext(event.data?.auth_token);
+              const ctx = await this.createContext(event.data);
               await trigger.handler(ctx, event.data);
             }
           }

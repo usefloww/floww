@@ -7,11 +7,12 @@ import type {
   GrantPermissionRequest,
 } from './types';
 import { KVError } from './types';
+import type { ExecutionContext } from '../cli/runtime/ExecutionContext';
 
 export class KVStore {
   constructor(
     private backendUrl: string,
-    private authToken: string
+    private context: ExecutionContext
   ) {}
 
   private async request<T>(
@@ -20,8 +21,9 @@ export class KVStore {
     body?: any
   ): Promise<T> {
     const url = `${this.backendUrl}/api${path}`;
+    const authToken = this.context.getAuthToken();
     const headers: Record<string, string> = {
-      'Authorization': `Bearer ${this.authToken}`,
+      'Authorization': `Bearer ${authToken || ''}`,
     };
 
     if (body !== undefined) {
