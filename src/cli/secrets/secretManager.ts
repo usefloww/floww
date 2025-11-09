@@ -257,7 +257,7 @@ export class SecretManager {
     const secrets: ProviderSecrets = {};
 
     // Build inquirer prompts
-    const prompts = [];
+    const prompts: any[] = [];
     for (const def of definitions) {
       const existingValue = await this.getSecret(
         providerType,

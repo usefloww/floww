@@ -172,7 +172,7 @@ export class DevModeOrchestrator {
 
     // Step 5: Setup event routing
     await logger.debugTask("Starting Flow Engine", async () => {
-      await this.eventRouter.start(result.triggers);
+      await this.eventRouter!.start(result.triggers);
 
       // Start debug inspector if enabled
       if (this.debugContext) {

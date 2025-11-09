@@ -158,7 +158,7 @@ async function editProvider(provider: Provider): Promise<void> {
       defaultValue: undefined, // Don't show current value for sensitive fields
     });
 
-    if (newValue && newValue.trim() !== "") {
+    if (newValue && typeof newValue === "string" && newValue.trim() !== "") {
       newConfig[key] = newValue;
     }
   }

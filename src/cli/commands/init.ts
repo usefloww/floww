@@ -7,7 +7,7 @@ import {
 } from "../config/projectConfig";
 import { fetchNamespaces } from "../api/apiMethods";
 import { logger } from "../utils/logger";
-import { createWorkflow } from "../utils/promptUtils";
+import { setupWorkflow } from "../utils/promptUtils";
 
 interface InitOptions {
   force?: boolean;
@@ -29,27 +29,24 @@ export async function initCommand(
   let projectDir = process.cwd();
 
   if (!options.silent) {
-    initMode = await logger.select(
-      "How would you like to initialize?",
-      [
-        {
-          value: "new" as const,
-          label: "Create new scaffolded project",
-          hint: "Generate complete project structure",
-        },
-        {
-          value: "current" as const,
-          label: "Initialize in current directory",
-          hint: "Add floww.yaml to existing project",
-        },
-      ],
-    );
+    initMode = await logger.select("How would you like to initialize?", [
+      {
+        value: "new" as const,
+        label: "Create new scaffolded project",
+        hint: "Generate complete project structure",
+      },
+      {
+        value: "current" as const,
+        label: "Initialize in current directory",
+        hint: "Add floww.yaml to existing project",
+      },
+    ]);
 
     // If creating new project, ask for directory name
     if (initMode === "new") {
       const dirName = await logger.text(
         "Project directory name:",
-        "my-floww-project",
+        "my-floww-project"
       );
       if (!dirName) {
         logger.error("Directory name is required");
@@ -57,7 +54,7 @@ export async function initCommand(
       }
       if (!/^[a-zA-Z0-9\-_]+$/.test(dirName)) {
         logger.error(
-          "Directory name can only contain letters, numbers, hyphens, and underscores",
+          "Directory name can only contain letters, numbers, hyphens, and underscores"
         );
         return null;
       }
@@ -108,7 +105,7 @@ export async function initCommand(
     }
 
     // Select or create workflow using shared utility
-    const { workflowId } = await createWorkflow({
+    const { workflowId } = await setupWorkflow({
       suggestedName: name,
       allowCreate: true,
     });
@@ -137,7 +134,7 @@ export async function initCommand(
       const exampleFile = path.join(projectDir, "main.ts");
       if (!fs.existsSync(exampleFile) && !options.silent) {
         const shouldCreateExample = await logger.confirm(
-          "Create example main.ts file?",
+          "Create example main.ts file?"
         );
         if (shouldCreateExample) {
           createExampleWorkflow(exampleFile);
@@ -266,7 +263,7 @@ function createPackageJson(filePath: string, projectName: string) {
       deploy: "floww deploy",
     },
     dependencies: {
-      "floww": "*",
+      floww: "*",
     },
     devDependencies: {
       "@types/node": "^22.0.0",
@@ -275,7 +272,11 @@ function createPackageJson(filePath: string, projectName: string) {
     },
   };
 
-  fs.writeFileSync(filePath, JSON.stringify(packageJson, null, 2) + "\n", "utf-8");
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify(packageJson, null, 2) + "\n",
+    "utf-8"
+  );
 }
 
 /**

@@ -30,7 +30,8 @@
     "src"
   ],
   "scripts": {
-    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "build": "pnpm typecheck && tsup",
     "dev": "tsup --watch",
     "floww": "tsx src/cli/index.ts",
     "test": "vitest",

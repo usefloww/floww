@@ -66,14 +66,16 @@ export async function configListCommand() {
   console.log("📋 Configuration:");
   console.log("");
 
+  const emojiMap = {
+    default: "🏠",
+    config: "📁",
+    env: "🌍",
+    cli: "⚡",
+  } as const;
+
   Object.entries(configWithSources).forEach(([key, { source, value }]) => {
     const cliKey = schema[key as ConfigKey].cliKey;
-    const sourceEmoji = {
-      default: "🏠",
-      config: "📁",
-      env: "🌍",
-      cli: "⚡",
-    }[source];
+    const sourceEmoji = emojiMap[source as keyof typeof emojiMap];
 
     console.log(`  ${cliKey}: ${value} ${sourceEmoji} ${source}`);
   });

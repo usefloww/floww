@@ -1,9 +1,9 @@
-import cron from "node-cron";
+import cron, { type ScheduledTask } from "node-cron";
 import { CronTrigger, CronEvent, Trigger } from "../../../common";
 import { EventProducer, EventStream } from "../types";
 
 export class CronEventProducer implements EventProducer {
-  private tasks: cron.ScheduledTask[] = [];
+  private tasks: ScheduledTask[] = [];
 
   async updateTriggers(
     triggers: Trigger[],

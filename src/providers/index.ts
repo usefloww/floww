@@ -8,4 +8,3 @@ export * from "./slack";
 export * from "./slack/api";
 export * from "./todoist";
 export * from "./todoist/api";
-export * from "./todoist/types";

@@ -254,7 +254,7 @@ export class FlowwLogger {
 
     const result = await select({
       message,
-      options,
+      options: options as any,
     });
 
     if (isCancel(result)) {
