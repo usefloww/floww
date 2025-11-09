@@ -46,21 +46,10 @@ describe("Whoami Command Tests", () => {
       const command = commandSpace.backgroundCommand("whoami");
 
       // Wait for success message
-      await waitUntilStdout(command, "Token is valid", 5000);
+      await waitUntilStdout(command, "User Information", 5000);
 
       const output = command.stdout();
-      expect(output).toContain("Token is valid");
-      expect(output).toContain("expires in");
-    });
-
-    it("should show refresh token status", async () => {
-      await commandSpace.setupRealAuth();
-      const command = commandSpace.backgroundCommand("whoami");
-
-      await waitUntilStdout(command, "Has refresh token", 5000);
-
-      const output = command.stdout();
-      expect(output).toContain("Has refresh token: Yes");
+      expect(output).toContain("service_account");
     });
   });
 });

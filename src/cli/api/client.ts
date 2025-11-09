@@ -56,7 +56,6 @@ export class ApiClient {
       Authorization: `Bearer ${auth.accessToken}`,
       ...headers,
     };
-    console.log(url);
 
     try {
       const fetch = await getFetch();
@@ -119,14 +118,14 @@ export class ApiClient {
  * Create API client with profile or fallback to config system
  */
 function createApiClient(): ApiClient {
-  const profile = loadActiveProfile();
-
-  if (profile) {
-    return new ApiClient(profile.backendUrl, profile.config.auth.client_id);
-  }
-
   const config = getConfig();
   return new ApiClient(config.backendUrl, config.workosClientId);
+
+  // const profile = loadActiveProfile();
+
+  // if (profile) {
+  //   return new ApiClient(profile.backendUrl, profile.config.auth.client_id);
+  // }
 }
 
 /**

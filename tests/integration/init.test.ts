@@ -25,6 +25,7 @@ describe("Init Command Tests", () => {
     await waitUntilStdout(command, "How would you like to initialize?");
 
     await wait(100);
+    command.writeArrowDown();
     command.writeEnter(); // select "Initialize in current directory"
 
     await waitUntilStdout(command, "Workflow name:");
@@ -48,7 +49,10 @@ describe("Init Command Tests", () => {
     await waitUntilStdout(command, "How would you like to initialize?");
 
     await wait(100);
-    command.writeArrowDown();
     command.writeEnter(); // select "Create new scaffolded project"
+
+    await waitUntilStdout(command, "Project directory name:");
+    command.write("my-workflow");
+    command.writeEnter(); // select "my-workflow"
   });
 });

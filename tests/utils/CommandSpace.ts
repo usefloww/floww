@@ -201,7 +201,7 @@ export class CommandSpace {
 
   backgroundCommand(
     commandString: string,
-    options?: { tty?: boolean }
+    options?: { tty?: boolean; env?: Record<string, string> }
   ): BackgroundCommand {
     if (!this.tempDir) {
       throw new Error("CommandSpace not initialized");
@@ -229,11 +229,18 @@ export class CommandSpace {
     const env = {
       ...process.env,
       FLOWW_NAMESPACE_ID: "test-namespace-id",
-      PATH: path.dirname(nodeExecutable) + ":" + (process.env.PATH || ""),
+      PATH:
+        path.dirname(nodeExecutable) +
+        ":" +
+        (process.env.PATH || "") +
+        ":" +
+        "/Users/toon/.local/share/mise/installs/pnpm/10.9.0/",
       // Use isolated config directory for tests
       XDG_CONFIG_HOME: path.join(this.tempDir, ".config"),
       // Enable colors in prompts for better terminal emulation
       FORCE_COLOR: "1",
+      // Merge custom env variables from options
+      ...options?.env,
     };
 
     let command: BackgroundCommand;

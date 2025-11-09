@@ -55,10 +55,8 @@ export function waitUntilStdout(
       } else if (Date.now() - start > timeout) {
         const error = new Error(
           `Timeout after ${timeout}ms waiting for pattern: "${pattern}"\n\n` +
-            `📝 Current stdout (${stdout.length} chars):\n${stdout.slice(
-              -1000
-            )}\n\n` +
-            `📝 Current stderr (${stderr.length} chars):\n${stderr.slice(-500)}`
+            `📝 Current stdout (${stdout.length} chars):\n${stdout}\n\n` +
+            `📝 Current stderr (${stderr.length} chars):\n${stderr}`
         );
 
         // Replace the stack to show where waitUntilStdout was called from
@@ -95,12 +93,8 @@ export function waitUntilStderr(
       } else if (Date.now() - start > timeout) {
         const error = new Error(
           `Timeout after ${timeout}ms waiting for pattern in stderr: "${pattern}"\n\n` +
-            `📝 Current stderr (${stderr.length} chars):\n${stderr.slice(
-              -500
-            )}\n\n` +
-            `📝 Current stdout (${stdout.length} chars):\n${stdout.slice(
-              -1000
-            )}`
+            `📝 Current stderr (${stderr.length} chars):\n${stderr}\n\n` +
+            `📝 Current stdout (${stdout.length} chars):\n${stdout}`
         );
 
         // Replace the stack to show where waitUntilStderr was called from
@@ -187,7 +181,7 @@ export async function selectOption(
       } else if (Date.now() - start > timeout) {
         const error = new Error(
           `Timeout after ${timeout}ms waiting for select prompt to appear\n\n` +
-            `📝 Current stdout:\n${stdout.slice(-1000)}`
+            `📝 Current stdout:\n${stdout}`
         );
         if (originalStack) {
           const lines = originalStack.split("\n");
@@ -277,14 +271,14 @@ export default [
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "floww": "file:../../.."
+    "floww": "0.0.8"
   }
 }
 `,
   },
   {
     name: "floww.yaml",
-    content: `workflowId: 12345678-1234-1234-1234-123456789abc
+    content: `workflowId: 799e43a6-a238-4d7f-baa4-fe0ff223f786
 name: Test Workflow
 version: 1.0.0
 entrypoint: main.ts

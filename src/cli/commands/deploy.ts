@@ -322,6 +322,7 @@ export async function deployCommand() {
           cwd: sdkDir,
           stdio: logger.interactive ? "pipe" : "inherit",
           shell: "/bin/bash",
+          env: process.env,
         }
       );
     });
@@ -450,7 +451,7 @@ export async function deployCommand() {
       }
       process.exit(1);
     }
-    
+
     // Re-throw other errors
     throw error;
   }
