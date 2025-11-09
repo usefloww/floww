@@ -61,11 +61,41 @@ fastify.get('/health', async (request, reply) => {
     return { status: 'ok' };
 });
 
+async function reportExecutionStatus(
+    backendUrl: string,
+    executionId: string,
+    authToken: string,
+    error?: { message: string; stack?: string }
+) {
+    try {
+        const response = await fetch(
+            `${backendUrl}/api/executions/${executionId}/complete`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(error ? { error } : {}),
+            }
+        );
+
+        if (!response.ok) {
+            console.error(`Failed to report execution status: ${response.status} ${response.statusText}`);
+        }
+    } catch (err) {
+        console.error('Error reporting execution status:', err);
+    }
+}
+
 // Main execution endpoint
 fastify.post('/execute', async (request, reply) => {
-    try {
-        const event = request.body as any;
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    const event = request.body as any;
+    const executionId = event.execution_id;
+    const authToken = event.auth_token;
 
+    try {
         // Import FlowEngine and code execution utilities
         const { executeUserProject } = await import('floww');
 
@@ -171,6 +201,11 @@ fastify.post('/execute', async (request, reply) => {
             console.log(`⚠️ No matching triggers found for ${event.triggerType}`);
         }
 
+        // Report successful execution
+        if (executionId && authToken) {
+            await reportExecutionStatus(backendUrl, executionId, authToken);
+        }
+
         return {
             statusCode: 200,
             message: 'Workflow executed successfully',
@@ -180,6 +215,14 @@ fastify.post('/execute', async (request, reply) => {
 
     } catch (error: any) {
         console.error('❌ Execution failed:', error);
+
+        // Report failed execution
+        if (executionId && authToken) {
+            await reportExecutionStatus(backendUrl, executionId, authToken, {
+                message: error.message,
+                stack: error.stack,
+            });
+        }
 
         reply.code(500);
         return {

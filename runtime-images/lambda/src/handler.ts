@@ -50,7 +50,38 @@ function createWrappedProject(
     };
 }
 
+async function reportExecutionStatus(
+    backendUrl: string,
+    executionId: string,
+    authToken: string,
+    error?: { message: string; stack?: string }
+) {
+    try {
+        const response = await fetch(
+            `${backendUrl}/api/executions/${executionId}/complete`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(error ? { error } : {}),
+            }
+        );
+
+        if (!response.ok) {
+            console.error(`Failed to report execution status: ${response.status} ${response.statusText}`);
+        }
+    } catch (err) {
+        console.error('Error reporting execution status:', err);
+    }
+}
+
 export const handler = async (event: any, context: any) => {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    const executionId = event.execution_id;
+    const authToken = event.auth_token;
+
     try {
         // Import FlowEngine and code execution utilities
         const { executeUserProject } = await import('floww');
@@ -151,6 +182,11 @@ export const handler = async (event: any, context: any) => {
             console.log(`⚠️ No matching triggers found for ${event.triggerType}`);
         }
 
+        // Report successful execution
+        if (executionId && authToken) {
+            await reportExecutionStatus(backendUrl, executionId, authToken);
+        }
+
         return {
             statusCode: 200,
             body: JSON.stringify({
@@ -161,6 +197,14 @@ export const handler = async (event: any, context: any) => {
 
     } catch (error) {
         console.error('❌ Lambda execution failed:', error);
+
+        // Report failed execution
+        if (executionId && authToken) {
+            await reportExecutionStatus(backendUrl, executionId, authToken, {
+                message: error.message,
+                stack: error.stack,
+            });
+        }
 
         return {
             statusCode: 500,
