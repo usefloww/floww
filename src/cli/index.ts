@@ -19,6 +19,15 @@ import {
   listProvidersCommand,
 } from "./crud/list";
 import { manageProviders } from "./providers/index";
+import {
+  ClientError,
+  UnauthenticatedError,
+  ForbiddenError,
+  NotFoundError,
+  ConflictError,
+  NetworkError,
+  ApiError,
+} from "./api/errors";
 
 const program = new Command();
 
@@ -155,4 +164,49 @@ program.hook("preAction", (thisCommand) => {
   setConfig(cliOptions);
 });
 
-program.parse();
+// Global error handler for ClientError
+async function main() {
+  try {
+    await program.parseAsync();
+  } catch (error) {
+    if (error instanceof ClientError) {
+      // Handle our custom API errors with user-friendly messages
+      if (error instanceof UnauthenticatedError) {
+        console.error(`\n❌ ${error.message}\n`);
+      } else if (error instanceof ForbiddenError) {
+        console.error(`\n❌ Access denied: ${error.message}\n`);
+      } else if (error instanceof NotFoundError) {
+        console.error(`\n❌ Not found: ${error.message}\n`);
+      } else if (error instanceof ConflictError) {
+        console.error(`\n❌ Conflict: ${error.message}\n`);
+      } else if (error instanceof NetworkError) {
+        console.error(`\n❌ Network error: ${error.message}\n`);
+        console.error("Please check your internet connection and try again.\n");
+      } else if (error instanceof ApiError) {
+        console.error(
+          `\n❌ API error (${error.statusCode}): ${error.message}\n`
+        );
+      } else {
+        console.error(`\n❌ Error: ${error.message}\n`);
+      }
+
+      // Show debug info if available
+      if (process.env.DEBUG && error.details) {
+        console.error("Debug details:", JSON.stringify(error.details, null, 2));
+      }
+
+      process.exit(1);
+    }
+
+    // Re-throw other errors
+    throw error;
+  }
+}
+
+main().catch((error) => {
+  console.error("\n❌ Unexpected error:", error.message);
+  if (process.env.DEBUG) {
+    console.error(error.stack);
+  }
+  process.exit(1);
+});

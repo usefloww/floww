@@ -27,7 +27,7 @@ afterAll(() => {
   server.close();
 });
 
-// ===== Mock getValidAuth() =====
+// ===== Mock getValidAuth() and loadActiveProfile() =====
 // This ensures tests don't require real authentication tokens
 
 vi.mock("../src/cli/auth/tokenUtils", () => ({
@@ -44,6 +44,34 @@ vi.mock("../src/cli/auth/tokenUtils", () => ({
   })),
   saveAuth: vi.fn(async () => {}),
   clearAuth: vi.fn(async () => {}),
+  getAuthToken: vi.fn(async () => "mock-access-token-123"),
+}));
+
+vi.mock("../src/cli/auth/authUtils", () => ({
+  loadActiveProfile: vi.fn(() => ({
+    backendUrl: "https://api.usefloww.dev",
+    config: {
+      auth: {
+        provider: "workos",
+        client_id: "client_test",
+      },
+      websocket_url: "wss://ws.usefloww.dev/connection/websocket",
+    },
+    auth: {
+      accessToken: "mock-access-token-123",
+      refreshToken: "mock-refresh-token-456",
+      expiresAt: Date.now() + 3600000,
+      user: {
+        id: "test-user-123",
+        email: "test@example.com",
+      },
+    },
+  })),
+  loadTokens: vi.fn(() => null),
+  saveProfile: vi.fn(),
+  saveTokens: vi.fn(),
+  setActiveProfile: vi.fn(),
+  clearTokens: vi.fn(),
 }));
 
 // ===== Mock Centrifuge WebSocket Client =====
@@ -190,10 +218,10 @@ import { setConfig } from "../src/cli/config/configUtils";
 
 setConfig({
   workosClientId: "client_test",
-  backendUrl: "https://api.flow.toondn.app",
+  backendUrl: "https://api.usefloww.dev",
   workosApiUrl: "https://api.workos.com",
-  websocketUrl: "wss://ws.flow.toondn.app/connection/websocket",
-  registryUrl: "registry.flow.toondn.app",
+  websocketUrl: "wss://ws.usefloww.dev/connection/websocket",
+  registryUrl: "registry.usefloww.dev",
 });
 
 // Suppress console logs during tests (optional - uncomment if needed)

@@ -42,78 +42,73 @@ async function logoutCommand() {
 }
 
 async function whoamiCommand() {
-  try {
-    const client = defaultApiClient();
-    const response = await client.apiCall("/whoami");
+  const client = defaultApiClient();
+  const user = await client.apiCall<any>("/whoami");
 
-    if (response.error?.startsWith("Authentication required")) {
-      logger.error("Not logged in. Please run `floww login` first.");
-      process.exit(1);
-    }
+  const profile = loadActiveProfile();
 
-    if (response.error || !response.data) {
-      logger.error(
-        response.error || "Failed to fetch user information from backend"
-      );
-      process.exit(1);
-    }
+  // Helper function to format labels with consistent width
+  const formatLabel = (label: string) => {
+    return chalk.gray(label.padEnd(12));
+  };
 
-    const user = response.data;
+  // Display user information in a nice format
+  console.log("\n" + chalk.bold.cyan("👤 User Information"));
+  console.log(chalk.gray("─".repeat(50)));
 
-    // Helper function to format labels with consistent width
-    const formatLabel = (label: string) => {
-      return chalk.gray(label.padEnd(12));
-    };
+  // Don't show email for service accounts
+  if (user.user_type !== "service_account") {
+    console.log(
+      `  ${formatLabel("Email:")}${
+        user.email ? chalk.white.bold(user.email) : chalk.dim("N/A")
+      }`
+    );
+  }
 
-    // Display user information in a nice format
-    console.log("\n" + chalk.bold.cyan("👤 User Information"));
-    console.log(chalk.gray("─".repeat(50)));
+  if (user.first_name || user.last_name) {
+    const fullName = [user.first_name, user.last_name]
+      .filter(Boolean)
+      .join(" ");
+    console.log(`  ${formatLabel("Name:")}${chalk.white(fullName)}`);
+  }
 
-    // Don't show email for service accounts
-    if (user.user_type !== "service_account") {
-      console.log(
-        `  ${formatLabel("Email:")}${
-          user.email ? chalk.white.bold(user.email) : chalk.dim("N/A")
-        }`
-      );
-    }
+  console.log(`  ${formatLabel("User ID:")}${chalk.dim(user.id)}`);
 
-    if (user.first_name || user.last_name) {
-      const fullName = [user.first_name, user.last_name]
-        .filter(Boolean)
-        .join(" ");
-      console.log(`  ${formatLabel("Name:")}${chalk.white(fullName)}`);
-    }
+  if (user.user_type) {
+    const userTypeColor =
+      user.user_type === "human" ? chalk.green : chalk.blue;
+    console.log(`  ${formatLabel("Type:")}${userTypeColor(user.user_type)}`);
+  }
 
-    console.log(`  ${formatLabel("User ID:")}${chalk.dim(user.id)}`);
+  if (user.created_at) {
+    const createdAt = new Date(user.created_at).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    console.log(`  ${formatLabel("Created on:")}${chalk.white(createdAt)}`);
+  }
 
-    if (user.user_type) {
-      const userTypeColor =
-        user.user_type === "human" ? chalk.green : chalk.blue;
-      console.log(`  ${formatLabel("Type:")}${userTypeColor(user.user_type)}`);
-    }
+  console.log(chalk.gray("─".repeat(50)));
+  console.log(chalk.bold.cyan("\n🔗 Connection"));
+  console.log(chalk.gray("─".repeat(50)));
 
-    if (user.created_at) {
-      const createdAt = new Date(user.created_at).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-      console.log(`  ${formatLabel("Created on:")}${chalk.white(createdAt)}`);
-    }
-
-    console.log(chalk.gray("─".repeat(50)));
-    console.log(chalk.bold.cyan("\n🔗 Connection"));
-    console.log(chalk.gray("─".repeat(50)));
+  if (profile) {
     console.log(
       `  ${formatLabel("Backend:")}${chalk.cyan(profile.backendUrl)}`
     );
-    console.log(`  ${formatLabel("Profile:")}${chalk.white(profile.name)}`);
-    console.log();
-  } catch (error) {
-    logger.error("Failed to fetch user information:", error);
-    process.exit(1);
+    console.log(
+      `  ${formatLabel("Profile:")}${chalk.white(new URL(profile.backendUrl).hostname)}`
+    );
+  } else if (process.env.FLOWW_TOKEN) {
+    const backendUrl = getConfigValue("backendUrl");
+    console.log(`  ${formatLabel("Backend:")}${chalk.cyan(backendUrl)}`);
+    console.log(
+      `  ${formatLabel("Auth:")}${chalk.yellow("FLOWW_TOKEN (API Key)")}`
+    );
   }
+
+  console.log();
 }
 
 export { loginCommand, logoutCommand, whoamiCommand };

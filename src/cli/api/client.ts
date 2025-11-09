@@ -1,146 +1,29 @@
-// Import fetch dynamically to handle ES module issues in bundled CLI
-async function getFetch() {
-  const { default: fetch } = await import("node-fetch");
-  return fetch;
-}
-import { getValidAuth } from "../auth/tokenUtils";
 import { loadActiveProfile } from "../auth/authUtils";
 import { getConfig } from "../config/configUtils";
-import { FlowwConfig } from "../config/configTypes";
+import { ApiClient } from "./types";
+import { UserApiClient } from "./UserApiClient";
+import { TokenApiClient } from "./TokenApiClient";
 
-export interface ApiCallOptions {
-  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-  body?: any;
-  headers?: Record<string, string>;
-}
-
-export interface ApiResponse<T = any> {
-  data?: T;
-  error?: string;
-  status: number;
-}
-
-export class ApiClient {
-  private baseUrl: string;
-  private clientId: string;
-
-  constructor(baseUrl: string, clientId: string) {
-    this.baseUrl = baseUrl.replace(/\/$/, "") + "/api"; // Remove trailing slash
-    this.clientId = clientId;
-  }
-
-  /**
-   * Make an authenticated API call to the backend
-   */
-  async apiCall<T = any>(
-    endpoint: string,
-    options: ApiCallOptions = {}
-  ): Promise<ApiResponse<T>> {
-    const { method = "GET", body, headers = {} } = options;
-
-    // Get authentication token
-    const auth = await getValidAuth();
-    if (!auth) {
-      return {
-        status: 401,
-        error: "Authentication required. Please run `floww auth login` first.",
-      };
-    }
-
-    // Prepare request
-    const url = `${this.baseUrl}${
-      endpoint.startsWith("/") ? endpoint : "/" + endpoint
-    }`;
-    const requestHeaders: Record<string, string> = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${auth.accessToken}`,
-      ...headers,
-    };
-
-    try {
-      const fetch = await getFetch();
-      const response = await fetch(url, {
-        method,
-        headers: requestHeaders,
-        body: body ? JSON.stringify(body) : undefined,
-      });
-
-      const responseData = await response.json().catch(() => null);
-
-      if (response.status === 401) {
-        // Token might be expired, try to refresh
-        const refreshedAuth = await getValidAuth();
-        if (refreshedAuth && refreshedAuth.accessToken !== auth.accessToken) {
-          // Retry the request with new token
-          requestHeaders[
-            "Authorization"
-          ] = `Bearer ${refreshedAuth.accessToken}`;
-          const retryResponse = await fetch(url, {
-            method,
-            headers: requestHeaders,
-            body: body ? JSON.stringify(body) : undefined,
-          });
-
-          const retryData = await retryResponse.json().catch(() => null);
-          return {
-            status: retryResponse.status,
-            data: retryData,
-            error: retryResponse.ok
-              ? undefined
-              : retryData?.detail || retryData?.error || "Request failed",
-          };
-        }
-
-        return {
-          status: 401,
-          error: "Authentication failed. Please run `floww auth login` again.",
-        };
-      }
-
-      return {
-        status: response.status,
-        data: responseData,
-        error: response.ok
-          ? undefined
-          : responseData?.detail || responseData?.error || "Request failed",
-      };
-    } catch (error) {
-      return {
-        status: 500,
-        error:
-          error instanceof Error ? error.message : "Network error occurred",
-      };
-    }
-  }
-}
-
-/**
- * Create API client with profile or fallback to config system
- */
 function createApiClient(): ApiClient {
-  const config = getConfig();
-  return new ApiClient(config.backendUrl, config.workosClientId);
+  // Priority 1: FLOWW_TOKEN environment variable
+  if (process.env.FLOWW_TOKEN) {
+    const config = getConfig();
+    return new TokenApiClient(config.backendUrl, process.env.FLOWW_TOKEN);
+  }
 
-  // const profile = loadActiveProfile();
+  // Priority 2: Active user profile
+  const profile = loadActiveProfile();
+  if (profile) {
+    return new UserApiClient(profile.backendUrl);
+  }
 
-  // if (profile) {
-  //   return new ApiClient(profile.backendUrl, profile.config.auth.client_id);
-  // }
+  // No authentication found
+  throw new Error(
+    "No authentication found. Run `floww auth login` or set FLOWW_TOKEN environment variable."
+  );
 }
 
-/**
- * Convenience function for making API calls with configuration
- */
-export async function apiCall<T = any>(
-  endpoint: string,
-  options: ApiCallOptions = {},
-  cliOptions: Partial<FlowwConfig> = {}
-): Promise<ApiResponse<T>> {
-  const client = createApiClient(cliOptions);
-  return client.apiCall<T>(endpoint, options);
-}
-
-// Default client instance (backwards compatibility)
+// Default client instance (singleton pattern)
 let _defaultApiClient: ApiClient | undefined;
 export const defaultApiClient = (): ApiClient => {
   if (!_defaultApiClient) {

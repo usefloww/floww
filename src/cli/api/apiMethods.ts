@@ -1,11 +1,5 @@
-import { getValidAuth } from "../auth/tokenUtils";
-import { getConfigValue } from "../config/configUtils";
-
-// Import fetch dynamically to handle ES module issues in bundled CLI
-async function getFetch() {
-  const { default: fetch } = await import("node-fetch");
-  return fetch;
-}
+import { defaultApiClient } from "./client";
+import { ConflictError } from "./errors";
 
 // Type definitions for API responses
 export interface Namespace {
@@ -108,56 +102,26 @@ export interface PushTokenResponse {
   registry_url: string;
 }
 
-// Helper function to make authenticated API calls
-async function makeApiCall(
-  endpoint: string,
-  options: any = {}
-): Promise<Response> {
-  const auth = await getValidAuth();
-
-  if (!auth) {
-    throw new Error('Not logged in. Please run "floww login" first.');
-  }
-
-  const fetch = await getFetch();
-  const backendUrl = getConfigValue("backendUrl");
-
-  return await fetch(`${backendUrl}/api${endpoint}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${auth.accessToken}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-}
-
 // Namespace API methods
 export async function fetchNamespaces(): Promise<Namespace[]> {
-  const response = await makeApiCall("/namespaces");
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-  const data = (await response.json()) as { results: Namespace[] };
+  const data = await defaultApiClient().apiCall<{ results: Namespace[] }>(
+    "/namespaces"
+  );
   return data.results;
 }
 
 // Workflow API methods
 export async function fetchWorkflows(): Promise<Workflow[]> {
-  const response = await makeApiCall("/workflows");
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-  const data = (await response.json()) as { results: Workflow[] };
+  const data = await defaultApiClient().apiCall<{ results: Workflow[] }>(
+    "/workflows"
+  );
   return data.results;
 }
 
 export async function fetchWorkflow(workflowId: string): Promise<Workflow> {
-  const response = await makeApiCall(`/workflows/${workflowId}`);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-  return (await response.json()) as Workflow;
+  return await defaultApiClient().apiCall<Workflow>(
+    `/workflows/${workflowId}`
+  );
 }
 
 export async function createWorkflow(
@@ -165,18 +129,14 @@ export async function createWorkflow(
   namespaceId: string,
   description?: string
 ): Promise<Workflow> {
-  const response = await makeApiCall("/workflows", {
+  return await defaultApiClient().apiCall<Workflow>("/workflows", {
     method: "POST",
-    body: JSON.stringify({
+    body: {
       name,
       namespace_id: namespaceId,
       description,
-    }),
+    },
   });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-  return (await response.json()) as Workflow;
 }
 
 // Helper function to read project files
@@ -239,28 +199,6 @@ export class ImageAlreadyExistsError extends Error {
   }
 }
 
-// Runtime API methods
-export async function getPushData(
-  image_hash: string
-): Promise<PushTokenResponse> {
-  const response = await makeApiCall("/runtimes/push_token", {
-    method: "POST",
-    body: JSON.stringify({
-      image_hash: image_hash,
-    }),
-  });
-
-  if (response.status === 409) {
-    throw new ImageAlreadyExistsError("Image already exists in registry");
-  }
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-
-  return (await response.json()) as PushTokenResponse;
-}
-
 export class RuntimeAlreadyExistsError extends Error {
   runtimeId: string;
 
@@ -271,89 +209,89 @@ export class RuntimeAlreadyExistsError extends Error {
   }
 }
 
+// Runtime API methods
+export async function getPushData(
+  image_hash: string
+): Promise<PushTokenResponse> {
+  try {
+    return await defaultApiClient().apiCall<PushTokenResponse>(
+      "/runtimes/push_token",
+      {
+        method: "POST",
+        body: { image_hash },
+      }
+    );
+  } catch (error) {
+    if (error instanceof ConflictError) {
+      throw new ImageAlreadyExistsError("Image already exists in registry");
+    }
+    throw error;
+  }
+}
+
 export async function createRuntime(
   runtimeData: RuntimeCreateRequest
 ): Promise<RuntimeCreateResponse> {
-  const response = await makeApiCall("/runtimes", {
-    method: "POST",
-    body: JSON.stringify(runtimeData),
-  });
-
-  if (response.status === 409) {
-    const errorData = (await response.json()) as any;
-    const runtimeId = errorData?.detail?.runtime_id;
-    if (runtimeId) {
-      throw new RuntimeAlreadyExistsError(runtimeId, "Runtime already exists");
+  try {
+    return await defaultApiClient().apiCall<RuntimeCreateResponse>(
+      "/runtimes",
+      {
+        method: "POST",
+        body: runtimeData,
+      }
+    );
+  } catch (error) {
+    if (error instanceof ConflictError) {
+      const runtimeId = (error.details as any)?.detail?.runtime_id;
+      throw new RuntimeAlreadyExistsError(
+        runtimeId || "unknown",
+        "Runtime already exists"
+      );
     }
-    throw new RuntimeAlreadyExistsError("unknown", "Runtime already exists");
+    throw error;
   }
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-
-  return (await response.json()) as RuntimeCreateResponse;
 }
 
 export async function getRuntimeStatus(
   runtimeId: string
 ): Promise<RuntimeStatusResponse> {
-  const response = await makeApiCall(`/runtimes/${runtimeId}`, {
-    method: "GET",
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-  return (await response.json()) as RuntimeStatusResponse;
+  return await defaultApiClient().apiCall<RuntimeStatusResponse>(
+    `/runtimes/${runtimeId}`
+  );
 }
 
 export async function createWorkflowDeployment(
   deploymentData: WorkflowDeploymentCreateRequest
 ): Promise<WorkflowDeploymentResponse> {
-  const response = await makeApiCall("/workflow_deployments", {
-    method: "POST",
-    body: JSON.stringify(deploymentData),
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-
-    // Try to parse error details for trigger failures
-    try {
-      const errorData = JSON.parse(errorText);
-      if (errorData.detail && errorData.detail.failed_triggers) {
-        // This is a trigger failure error - throw a special error with details
-        const triggerError = new Error(
-          errorData.detail.message || "Failed to create triggers"
-        );
-        (triggerError as any).failedTriggers = errorData.detail.failed_triggers;
-        throw triggerError;
+  try {
+    return await defaultApiClient().apiCall<WorkflowDeploymentResponse>(
+      "/workflow_deployments",
+      {
+        method: "POST",
+        body: deploymentData,
       }
-    } catch (parseError: any) {
-      // If this is our trigger error, re-throw it
-      if (parseError.failedTriggers) {
-        throw parseError;
-      }
-      // Otherwise, it's a JSON parse error or other error, throw generic error
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    );
+  } catch (error: any) {
+    // Check if this is a trigger failure error
+    if (error.details?.detail?.failed_triggers) {
+      const triggerError = new Error(
+        error.details.detail.message || "Failed to create triggers"
+      );
+      (triggerError as any).failedTriggers =
+        error.details.detail.failed_triggers;
+      throw triggerError;
     }
-
-    // Fallback (shouldn't reach here)
-    throw new Error(`HTTP ${response.status}: ${errorText}`);
+    throw error;
   }
-  return (await response.json()) as WorkflowDeploymentResponse;
 }
 
 export async function listWorkflowDeployments(
   workflowId?: string
 ): Promise<WorkflowDeploymentResponse[]> {
   const queryParams = workflowId ? `?workflow_id=${workflowId}` : "";
-  const response = await makeApiCall(`/workflow_deployments${queryParams}`);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-  const data = (await response.json()) as {
+  const data = await defaultApiClient().apiCall<{
     results: WorkflowDeploymentResponse[];
-  };
+  }>(`/workflow_deployments${queryParams}`);
   return data.results;
 }
 
@@ -400,58 +338,46 @@ export interface ProviderUpdateRequest {
 
 // Provider API methods
 export async function fetchProviders(): Promise<Provider[]> {
-  const response = await makeApiCall("/providers");
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-  const data = (await response.json()) as { results: Provider[] };
+  const data = await defaultApiClient().apiCall<{ results: Provider[] }>(
+    "/providers"
+  );
   return data.results;
 }
 
 export async function fetchProviderType(
   providerType: string
 ): Promise<ProviderType> {
-  const response = await makeApiCall(`/provider_types/${providerType}`);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-  return (await response.json()) as ProviderType;
+  return await defaultApiClient().apiCall<ProviderType>(
+    `/provider_types/${providerType}`
+  );
 }
 
 export async function createProvider(
   providerData: ProviderCreateRequest
 ): Promise<Provider> {
-  const response = await makeApiCall("/providers", {
+  return await defaultApiClient().apiCall<Provider>("/providers", {
     method: "POST",
-    body: JSON.stringify(providerData),
+    body: providerData,
   });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-  return (await response.json()) as Provider;
 }
 
 export async function updateProvider(
   providerId: string,
   updateData: ProviderUpdateRequest
 ): Promise<Provider> {
-  const response = await makeApiCall(`/providers/${providerId}`, {
-    method: "PATCH",
-    body: JSON.stringify(updateData),
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
-  return (await response.json()) as Provider;
+  return await defaultApiClient().apiCall<Provider>(
+    `/providers/${providerId}`,
+    {
+      method: "PATCH",
+      body: updateData,
+    }
+  );
 }
 
 export async function deleteProvider(providerId: string): Promise<void> {
-  const response = await makeApiCall(`/providers/${providerId}`, {
+  await defaultApiClient().apiCall<void>(`/providers/${providerId}`, {
     method: "DELETE",
   });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
 }
 
 // Dev Mode API methods
@@ -467,35 +393,24 @@ export interface DevTriggerSyncResponse {
 export async function syncDevTriggers(
   data: DevTriggerSyncRequest
 ): Promise<DevTriggerSyncResponse> {
-  const response = await makeApiCall("/dev/sync-triggers", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-
-    // Try to parse error details for trigger failures
-    try {
-      const errorData = JSON.parse(errorText);
-      if (errorData.detail && errorData.detail.failed_triggers) {
-        // This is a trigger failure error - throw a special error with details
-        const triggerError = new Error(
-          errorData.detail.message || "Failed to create triggers"
-        );
-        (triggerError as any).failedTriggers = errorData.detail.failed_triggers;
-        throw triggerError;
+  try {
+    return await defaultApiClient().apiCall<DevTriggerSyncResponse>(
+      "/dev/sync-triggers",
+      {
+        method: "POST",
+        body: data,
       }
-    } catch (parseError: any) {
-      // If this is our trigger error, re-throw it
-      if (parseError.failedTriggers) {
-        throw parseError;
-      }
-      // Otherwise, it's a JSON parse error or other error, throw generic error
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    );
+  } catch (error: any) {
+    // Check if this is a trigger failure error
+    if (error.details?.detail?.failed_triggers) {
+      const triggerError = new Error(
+        error.details.detail.message || "Failed to create triggers"
+      );
+      (triggerError as any).failedTriggers =
+        error.details.detail.failed_triggers;
+      throw triggerError;
     }
-
-    // Fallback (shouldn't reach here)
-    throw new Error(`HTTP ${response.status}: ${errorText}`);
+    throw error;
   }
-  return (await response.json()) as DevTriggerSyncResponse;
 }

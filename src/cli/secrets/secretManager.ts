@@ -1,5 +1,6 @@
 import inquirer from "inquirer";
-import { ApiClient } from "../api/client";
+import { ApiClient } from "../api/types";
+import { NotFoundError } from "../api/errors";
 
 export type SecretDefinition = {
   key: string;
@@ -43,31 +44,31 @@ export class SecretManager {
   ): Promise<string | undefined> {
     const secretName = `${credentialName}:${key}`;
 
-    // First, list secrets to find the matching one
-    const response = await this.apiClient.apiCall<SecretResponse[]>(
-      `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}&name=${encodeURIComponent(secretName)}`,
-    );
+    try {
+      // First, list secrets to find the matching one
+      const secrets = await this.apiClient.apiCall<SecretResponse[]>(
+        `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}&name=${encodeURIComponent(secretName)}`,
+      );
 
-    // 404 Not Found is okay - it just means no secrets exist yet
-    if (response.error && response.status !== 404) {
-      throw new Error(`Failed to get secret: ${response.error}`);
+      if (!Array.isArray(secrets) || secrets.length === 0) {
+        return undefined;
+      }
+
+      // Get the secret with its decrypted value
+      const secret = secrets[0];
+      const secretWithValue =
+        await this.apiClient.apiCall<SecretWithValueResponse>(
+          `/secrets/${secret.id}`,
+        );
+
+      return secretWithValue?.value;
+    } catch (error) {
+      // 404 Not Found is okay - it just means no secrets exist yet
+      if (error instanceof NotFoundError) {
+        return undefined;
+      }
+      throw error;
     }
-
-    if (
-      !response.data ||
-      !Array.isArray(response.data) ||
-      response.data.length === 0
-    ) {
-      return undefined;
-    }
-
-    // Get the secret with its decrypted value
-    const secret = response.data[0];
-    const valueResponse = await this.apiClient.apiCall<SecretWithValueResponse>(
-      `/secrets/${secret.id}`,
-    );
-
-    return valueResponse.data?.value;
   }
 
   /**
@@ -77,50 +78,49 @@ export class SecretManager {
     providerType: string,
     credentialName: string,
   ): Promise<ProviderSecrets | undefined> {
-    // List all secrets for this provider
-    const response = await this.apiClient.apiCall<SecretResponse[]>(
-      `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}`,
-    );
+    try {
+      // List all secrets for this provider
+      const allSecrets = await this.apiClient.apiCall<SecretResponse[]>(
+        `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}`,
+      );
 
-    // 404 Not Found is okay - it just means no secrets exist yet
-    if (response.error && response.status !== 404) {
-      throw new Error(`Failed to get provider secrets: ${response.error}`);
-    }
-
-    if (
-      !response.data ||
-      !Array.isArray(response.data) ||
-      response.data.length === 0
-    ) {
-      return undefined;
-    }
-
-    // Filter secrets that match the credential name pattern
-    const prefix = `${credentialName}:`;
-    const matchingSecrets = response.data.filter((s) =>
-      s.name.startsWith(prefix),
-    );
-
-    if (matchingSecrets.length === 0) {
-      return undefined;
-    }
-
-    // Fetch all secret values
-    const secrets: ProviderSecrets = {};
-    for (const secret of matchingSecrets) {
-      const valueResponse =
-        await this.apiClient.apiCall<SecretWithValueResponse>(
-          `/secrets/${secret.id}`,
-        );
-
-      if (valueResponse.data?.value) {
-        // Extract the key from the name (remove "credentialName:" prefix)
-        const key = secret.name.substring(prefix.length);
-        secrets[key] = valueResponse.data.value;
+      if (!Array.isArray(allSecrets) || allSecrets.length === 0) {
+        return undefined;
       }
-    }
 
-    return Object.keys(secrets).length > 0 ? secrets : undefined;
+      // Filter secrets that match the credential name pattern
+      const prefix = `${credentialName}:`;
+      const matchingSecrets = allSecrets.filter((s) =>
+        s.name.startsWith(prefix),
+      );
+
+      if (matchingSecrets.length === 0) {
+        return undefined;
+      }
+
+      // Fetch all secret values
+      const secrets: ProviderSecrets = {};
+      for (const secret of matchingSecrets) {
+        const secretWithValue =
+          await this.apiClient.apiCall<SecretWithValueResponse>(
+            `/secrets/${secret.id}`,
+          );
+
+        if (secretWithValue?.value) {
+          // Extract the key from the name (remove "credentialName:" prefix)
+          const key = secret.name.substring(prefix.length);
+          secrets[key] = secretWithValue.value;
+        }
+      }
+
+      return Object.keys(secrets).length > 0 ? secrets : undefined;
+    } catch (error) {
+      // 404 Not Found is okay - it just means no secrets exist yet
+      if (error instanceof NotFoundError) {
+        return undefined;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -134,47 +134,44 @@ export class SecretManager {
   ): Promise<void> {
     const secretName = `${credentialName}:${key}`;
 
-    // Check if secret already exists
-    const existing = await this.apiClient.apiCall<SecretResponse[]>(
-      `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}&name=${encodeURIComponent(secretName)}`,
-    );
-
-    // 404 Not Found is okay - it just means no secrets exist yet
-    if (existing.error && existing.status !== 404) {
-      throw new Error(`Failed to check existing secret: ${existing.error}`);
-    }
-
-    if (
-      existing.data &&
-      Array.isArray(existing.data) &&
-      existing.data.length > 0
-    ) {
-      // Update existing secret
-      const updateResponse = await this.apiClient.apiCall(
-        `/secrets/${existing.data[0].id}`,
-        {
-          method: "PATCH",
-          body: { value },
-        },
+    try {
+      // Check if secret already exists
+      const existing = await this.apiClient.apiCall<SecretResponse[]>(
+        `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}&name=${encodeURIComponent(secretName)}`,
       );
 
-      if (updateResponse.error) {
-        throw new Error(`Failed to update secret: ${updateResponse.error}`);
+      if (Array.isArray(existing) && existing.length > 0) {
+        // Update existing secret
+        await this.apiClient.apiCall(`/secrets/${existing[0].id}`, {
+          method: "PATCH",
+          body: { value },
+        });
+      } else {
+        // Create new secret
+        await this.apiClient.apiCall("/secrets/", {
+          method: "POST",
+          body: {
+            namespace_id: this.namespaceId,
+            name: secretName,
+            provider: providerType,
+            value,
+          },
+        });
       }
-    } else {
-      // Create new secret
-      const createResponse = await this.apiClient.apiCall("/secrets/", {
-        method: "POST",
-        body: {
-          namespace_id: this.namespaceId,
-          name: secretName,
-          provider: providerType,
-          value,
-        },
-      });
-
-      if (createResponse.error) {
-        throw new Error(`Failed to create secret: ${createResponse.error}`);
+    } catch (error) {
+      // 404 Not Found means no secrets exist, so create new
+      if (error instanceof NotFoundError) {
+        await this.apiClient.apiCall("/secrets/", {
+          method: "POST",
+          body: {
+            namespace_id: this.namespaceId,
+            name: secretName,
+            provider: providerType,
+            value,
+          },
+        });
+      } else {
+        throw error;
       }
     }
   }
@@ -336,26 +333,34 @@ export class SecretManager {
     providerType: string,
     credentialName: string,
   ): Promise<void> {
-    // List all secrets for this provider and credential
-    const response = await this.apiClient.apiCall<SecretResponse[]>(
-      `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}`,
-    );
+    try {
+      // List all secrets for this provider and credential
+      const allSecrets = await this.apiClient.apiCall<SecretResponse[]>(
+        `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}`,
+      );
 
-    if (!response.data || response.data.length === 0) {
-      return;
-    }
+      if (!Array.isArray(allSecrets) || allSecrets.length === 0) {
+        return;
+      }
 
-    // Filter secrets that match the credential name pattern
-    const prefix = `${credentialName}:`;
-    const matchingSecrets = response.data.filter((s) =>
-      s.name.startsWith(prefix),
-    );
+      // Filter secrets that match the credential name pattern
+      const prefix = `${credentialName}:`;
+      const matchingSecrets = allSecrets.filter((s) =>
+        s.name.startsWith(prefix),
+      );
 
-    // Delete each matching secret
-    for (const secret of matchingSecrets) {
-      await this.apiClient.apiCall(`/secrets/${secret.id}`, {
-        method: "DELETE",
-      });
+      // Delete each matching secret
+      for (const secret of matchingSecrets) {
+        await this.apiClient.apiCall(`/secrets/${secret.id}`, {
+          method: "DELETE",
+        });
+      }
+    } catch (error) {
+      // 404 Not Found is okay - it just means no secrets exist
+      if (error instanceof NotFoundError) {
+        return;
+      }
+      throw error;
     }
   }
 
@@ -363,20 +368,28 @@ export class SecretManager {
    * Clear all secrets in the namespace
    */
   async clearAllSecrets(): Promise<void> {
-    // List all secrets in the namespace
-    const response = await this.apiClient.apiCall<SecretResponse[]>(
-      `/secrets/namespace/${this.namespaceId}`,
-    );
+    try {
+      // List all secrets in the namespace
+      const allSecrets = await this.apiClient.apiCall<SecretResponse[]>(
+        `/secrets/namespace/${this.namespaceId}`,
+      );
 
-    if (!response.data || response.data.length === 0) {
-      return;
-    }
+      if (!Array.isArray(allSecrets) || allSecrets.length === 0) {
+        return;
+      }
 
-    // Delete each secret
-    for (const secret of response.data) {
-      await this.apiClient.apiCall(`/secrets/${secret.id}`, {
-        method: "DELETE",
-      });
+      // Delete each secret
+      for (const secret of allSecrets) {
+        await this.apiClient.apiCall(`/secrets/${secret.id}`, {
+          method: "DELETE",
+        });
+      }
+    } catch (error) {
+      // 404 Not Found is okay - it just means no secrets exist
+      if (error instanceof NotFoundError) {
+        return;
+      }
+      throw error;
     }
   }
 }
