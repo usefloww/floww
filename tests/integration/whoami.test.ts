@@ -18,7 +18,9 @@ describe("Whoami Command Tests", () => {
 
   describe("Unauthenticated State", () => {
     it("should show not logged in message when user is not authenticated", async () => {
-      const command = commandSpace.backgroundCommand("whoami");
+      const command = commandSpace.backgroundCommand("whoami", {
+        env: { FLOWW_TOKEN: "" },
+      });
 
       // Wait for the command to complete and show output
       await waitUntilStderr(command, "Not logged in", 3000);
@@ -27,7 +29,9 @@ describe("Whoami Command Tests", () => {
     });
 
     it("should exit with appropriate code when not authenticated", async () => {
-      const command = commandSpace.backgroundCommand("whoami");
+      const command = commandSpace.backgroundCommand("whoami", {
+        env: { FLOWW_TOKEN: "" },
+      });
 
       // Wait for the command to complete
       await waitUntilStderr(command, "Not logged in", 3000);
@@ -42,7 +46,6 @@ describe("Whoami Command Tests", () => {
 
   describe("Authenticated State", () => {
     it("should show user info when authenticated", async () => {
-      await commandSpace.setupRealAuth();
       const command = commandSpace.backgroundCommand("whoami");
 
       // Wait for success message

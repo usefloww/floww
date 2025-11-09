@@ -14,7 +14,6 @@ describe("Dev Mode E2E Tests", () => {
   beforeEach(async () => {
     commandSpace = new CommandSpace(simpleExampleFiles);
     await commandSpace.initialize();
-    await commandSpace.setupRealAuth();
   });
 
   afterEach(async () => {

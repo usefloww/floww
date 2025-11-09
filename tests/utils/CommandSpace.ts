@@ -144,21 +144,6 @@ export class CommandSpace {
     }
   }
 
-  async setupRealAuth(): Promise<void> {
-    // Copy from real auth file for now from user home directory
-    const homeDir = process.env.HOME;
-    if (!homeDir) {
-      throw new Error("HOME environment variable is not set");
-    }
-    if (!this.tempDir) {
-      throw new Error("CommandSpace not initialized");
-    }
-    const realConfigDir = path.join(homeDir, ".config", "floww");
-    const tempConfigDir = path.join(this.tempDir, ".config", "floww");
-
-    await fs.cp(realConfigDir, tempConfigDir, { recursive: true });
-  }
-
   async setupMockAuth(): Promise<void> {
     if (!this.tempDir) {
       throw new Error("CommandSpace not initialized");

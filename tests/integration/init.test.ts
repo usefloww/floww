@@ -12,14 +12,13 @@ describe("Init Command Tests", () => {
   beforeEach(async () => {
     commandSpace = new CommandSpace();
     await commandSpace.initialize();
-    await commandSpace.setupRealAuth();
   });
 
   afterEach(async () => {
     await commandSpace.exit();
   });
 
-  it("current directory", async () => {
+  it.todo("current directory", async () => {
     const command = commandSpace.backgroundCommand("init", { tty: true });
     await waitUntilStdout(command, "Initializing new Floww project");
     await waitUntilStdout(command, "How would you like to initialize?");

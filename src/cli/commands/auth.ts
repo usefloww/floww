@@ -42,21 +42,14 @@ async function logoutCommand() {
 }
 
 async function whoamiCommand() {
-  const profile = loadActiveProfile();
-  if (!profile) {
-    const oldTokens = loadTokens();
-    if (oldTokens) {
-      logger.warn(
-        "Found old-style auth. Please login again to use the new profile system."
-      );
-    }
-    logger.error('Not logged in. Run "floww login" first.');
-    process.exit(1);
-  }
-
   try {
     const client = defaultApiClient();
     const response = await client.apiCall("/whoami");
+
+    if (response.error?.startsWith("Authentication required")) {
+      logger.error("Not logged in. Please run `floww login` first.");
+      process.exit(1);
+    }
 
     if (response.error || !response.data) {
       logger.error(

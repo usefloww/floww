@@ -181,7 +181,7 @@ importers:
         specifier: 0.0.8
         version: 0.0.8(@types/node@24.10.0)(typescript@5.9.3)
 
-  examples/test_vi9tlq:
+  examples/test_dae9te:
     dependencies:
       floww:
         specifier: 0.0.8

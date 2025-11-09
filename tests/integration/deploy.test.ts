@@ -12,7 +12,6 @@ describe("Deploy Command Tests", () => {
   beforeEach(async () => {
     commandSpace = new CommandSpace(randomExampleFiles());
     await commandSpace.initialize();
-    await commandSpace.setupRealAuth();
   });
 
   afterEach(async () => {
