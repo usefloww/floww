@@ -201,7 +201,7 @@ export class Slack extends BaseProvider {
 
   private getApi(): SlackApi {
     if (!this.api) {
-      const botToken = this.getConfig("bot_token");
+      const botToken = this.getSecret("bot_token");
       this.api = new SlackApi({ botToken });
     }
     return this.api;

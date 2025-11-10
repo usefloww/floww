@@ -280,44 +280,20 @@ function createPackageJson(filePath: string, projectName: string) {
 }
 
 /**
- * Create optimized Dockerfile for Node.js with minimal image size
+ * Create Dockerfile for Lambda deployment with Floww runtime image
  */
 function createDockerfile(filePath: string) {
-  const dockerfile = `# Use official Node.js slim image for minimal size
-FROM node:20-slim AS builder
+  const dockerfile = `FROM ghcr.io/usefloww/lambda-runtime:latest
 
-# Set working directory
-WORKDIR /app
-
-# Copy package files
+# Install project dependencies (including SDK)
 COPY package.json package-lock.json* pnpm-lock.yaml* ./
+RUN npm install --omit=dev
 
-# Install dependencies (production only)
-RUN npm ci --only=production || npm install --only=production
-
-# Final stage
-FROM node:20-slim
-
-# Set working directory
-WORKDIR /var/task
-
-# Copy dependencies from builder
-COPY --from=builder /app/node_modules ./node_modules
-
-# Copy application code
-COPY . .
-
-# Set environment variable for entrypoint
+# Set entrypoint from config
 ENV FLOWW_ENTRYPOINT=main.ts
 
-# Clean up to reduce image size
-RUN rm -rf /root/.npm && \\
-    rm -rf /tmp/* && \\
-    apt-get clean && \\
-    rm -rf /var/lib/apt/lists/*
-
-# Run the workflow
-CMD ["node", "main.ts"]
+# No source code copying - code will be provided via Lambda event payload
+# SDK must be listed in package.json dependencies
 `;
 
   fs.writeFileSync(filePath, dockerfile, "utf-8");

@@ -203,8 +203,8 @@ export class Jira extends BaseProvider {
   private getApi(): JiraApi {
     if (!this.api) {
       const instanceUrl = this.getConfig("instance_url");
-      const email = this.getConfig("email");
-      const apiToken = this.getConfig("api_token");
+      const email = this.getSecret("email");
+      const apiToken = this.getSecret("api_token");
 
       if (!instanceUrl) {
         throw new Error(

@@ -93,8 +93,19 @@ export const handler = async (event: any, context: any) => {
             throw new Error('No userCode provided in event payload');
         }
 
-        // Get entrypoint from environment or default
-        const entrypoint = process.env.FLOWW_ENTRYPOINT || 'main.ts';
+        // Handle both formats: {files: {...}, entrypoint: "..."} or just {...}
+        let files: Record<string, string>;
+        let entrypoint: string;
+
+        if (event.userCode.files && event.userCode.entrypoint) {
+            // New format: {files: {...}, entrypoint: "..."}
+            files = event.userCode.files;
+            entrypoint = event.userCode.entrypoint || process.env.FLOWW_ENTRYPOINT || 'main.ts';
+        } else {
+            // Legacy format: just the files object
+            files = event.userCode;
+            entrypoint = process.env.FLOWW_ENTRYPOINT || 'main.ts';
+        }
 
         console.log(`📂 Loading entrypoint: ${entrypoint}`);
 
@@ -103,7 +114,7 @@ export const handler = async (event: any, context: any) => {
 
         // Create wrapped project with auto-registration support
         const wrappedProject = createWrappedProject(
-            event.userCode,
+            files,
             entrypoint,
             providerConfigs
         );
