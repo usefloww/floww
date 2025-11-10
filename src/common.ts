@@ -11,6 +11,16 @@ export type Handler<TEvent = any, TContext = any> = (
   event: TEvent,
 ) => void | Promise<void>;
 
+// Base event with framework metadata
+export type BaseEvent = {
+  /** Framework metadata - not part of the user event data */
+  __context?: {
+    auth_token?: string; // Short-lived JWT for workflow-to-backend authentication
+    backend_url?: string; // Backend URL for API calls
+    workflow_id?: string; // Workflow ID for the current execution
+  };
+};
+
 // Base trigger interface
 export interface Trigger<TEvent = any, TContext = any> {
   type: string;
@@ -18,13 +28,12 @@ export interface Trigger<TEvent = any, TContext = any> {
 }
 
 // Webhook-specific types
-export type WebhookEvent<TBody = any> = {
+export type WebhookEvent<TBody = any> = BaseEvent & {
   body: TBody;
   headers: Record<string, string>;
   query: Record<string, string>;
   method: string;
   path: string;
-  auth_token?: string; // Short-lived JWT for workflow-to-backend authentication
 };
 
 export type WebhookContext = BaseContext & {
@@ -65,7 +74,7 @@ export type WebhookTriggerArgs<TBody = any> = {
 };
 
 // Cron-specific trigger
-export type CronEvent = {
+export type CronEvent = BaseEvent & {
   scheduledTime: Date;
   actualTime: Date;
 };
@@ -99,13 +108,12 @@ export type CronTriggerArgs = {
 };
 
 // Realtime-specific trigger
-export type RealtimeEvent<TPayload = any> = {
+export type RealtimeEvent<TPayload = any> = BaseEvent & {
   type: string;
   workflow_id: string;
   payload: TPayload;
   timestamp: string;
   channel: string;
-  auth_token?: string; // Short-lived JWT for workflow-to-backend authentication
 };
 
 export type RealtimeContext = BaseContext & {

@@ -99,23 +99,29 @@ export class ExecutionContext {
   static fromEvent(event: any): ExecutionContext {
     const contextData: ExecutionContextData = {};
 
-    // Extract auth token if present
-    if (event?.auth_token) {
+    // Extract from __context if present (new format)
+    if (event?.__context) {
+      if (event.__context.auth_token) {
+        contextData.authToken = event.__context.auth_token;
+      }
+      if (event.__context.backend_url) {
+        contextData.backendUrl = event.__context.backend_url;
+      }
+      if (event.__context.workflow_id) {
+        contextData.workflowId = event.__context.workflow_id;
+      }
+    }
+
+    // Fallback to top-level fields for backward compatibility
+    if (!contextData.authToken && event?.auth_token) {
       contextData.authToken = event.auth_token;
     }
-
-    // Extract workflow ID if present
-    if (event?.workflow_id) {
+    if (!contextData.workflowId && event?.workflow_id) {
       contextData.workflowId = event.workflow_id;
     }
-
-    // Extract backend URL if present
-    if (event?.backend_url) {
+    if (!contextData.backendUrl && event?.backend_url) {
       contextData.backendUrl = event.backend_url;
     }
-
-    // Add more field mappings here as needed
-    // Example: if (event?.user_id) contextData.userId = event.user_id;
 
     return new ExecutionContext(contextData);
   }

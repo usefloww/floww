@@ -105,7 +105,9 @@ export class WebhookEventProducer implements EventProducer {
           query: request.query as Record<string, string>,
           method: request.method,
           path: request.url,
-          backend_url: process.env.FLOWW_BACKEND_URL || 'https://api.usefloww.dev',
+          __context: {
+            backend_url: process.env.FLOWW_BACKEND_URL || 'https://api.usefloww.dev',
+          },
         };
 
         if (webhookMeta.trigger.validation) {
