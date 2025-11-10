@@ -33,9 +33,7 @@ export async function checkProviderAvailability(
     usedProviders.forEach((used) => {
       const key = `${used.type}:${used.alias || "default"}`;
 
-      if (used.type == "builtin") {
-        available.push(used);
-      } else if (existingMap.has(key)) {
+      if (existingMap.has(key)) {
         available.push(used);
       } else {
         unavailable.push(used);

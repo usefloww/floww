@@ -1,11 +1,9 @@
-import type { KVStore } from './kv';
-
 // Export ExecutionContext for use by services
 export { ExecutionContext } from './cli/runtime/ExecutionContext';
 export type { ExecutionContextData } from './cli/runtime/ExecutionContext';
 
 export type BaseContext = {
-  kv: KVStore;
+  // Base context is now empty - providers are instantiated directly
 };
 
 export type Handler<TEvent = any, TContext = any> = (

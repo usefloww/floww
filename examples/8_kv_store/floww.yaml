@@ -1,4 +1,4 @@
-workflowId: 023b1c97-36f6-48fe-af77-a172153d5d24
-name: kv-store-example
+workflowId: d7c34da0-8a5b-4a93-bdea-6c0a6be15e6b
+name: test-kv
 version: 1.0.0
 entrypoint: main.ts

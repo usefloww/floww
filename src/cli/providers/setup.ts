@@ -22,12 +22,50 @@ export async function setupUnavailableProviders(
     return;
   }
 
+  // Separate providers into those that need setup vs auto-created
+  const providersNeedingSetup: UsedProvider[] = [];
+  const providersToAutoCreate: UsedProvider[] = [];
+
+  for (const provider of unavailableProviders) {
+    try {
+      const providerType = await fetchProviderType(provider.type);
+      if (providerType.setup_steps.length === 0) {
+        providersToAutoCreate.push(provider);
+      } else {
+        providersNeedingSetup.push(provider);
+      }
+    } catch (error) {
+      logger.error(`Failed to fetch provider type for ${provider.type}`, error);
+      providersNeedingSetup.push(provider); // Treat as needing setup if we can't determine
+    }
+  }
+
+  // Auto-create providers that don't need setup (like KVStore)
+  for (const provider of providersToAutoCreate) {
+    await logger.task(
+      `Auto-creating ${provider.type} provider (${provider.alias})`,
+      async () => {
+        await createProvider({
+          namespace_id: namespaceId,
+          type: provider.type,
+          alias: provider.alias || provider.type,
+          config: {},
+        });
+      }
+    );
+  }
+
+  // If all providers were auto-created, we're done
+  if (providersNeedingSetup.length === 0) {
+    return;
+  }
+
   logger.warn(
-    `${unavailableProviders.length} provider(s) need configuration`
+    `${providersNeedingSetup.length} provider(s) need configuration`
   );
   intro("🔌 Provider Setup Required");
 
-  const providersList = unavailableProviders
+  const providersList = providersNeedingSetup
     .map(
       (provider) =>
         `  • ${provider.type}${
@@ -37,7 +75,7 @@ export async function setupUnavailableProviders(
     .join("\n");
 
   logger.plain(
-    `Found ${unavailableProviders.length} unavailable provider(s) that need to be configured:\n${providersList}`
+    `Found ${providersNeedingSetup.length} unavailable provider(s) that need to be configured:\n${providersList}`
   );
 
   const shouldContinue = await confirm({
@@ -58,8 +96,8 @@ export async function setupUnavailableProviders(
   // Use the workflow's namespace (no prompt needed)
   logger.plain(`Using workflow namespace: ${namespaceId}`);
 
-  // Set up each unavailable provider
-  for (const provider of unavailableProviders) {
+  // Set up each provider that needs configuration
+  for (const provider of providersNeedingSetup) {
     await setupSingleProvider(provider, namespaceId);
   }
 

@@ -4,6 +4,7 @@ import { createRequire } from "module";
 import { VirtualFileSystem } from "./VirtualFileSystem";
 import { DebugContext } from "../cli/debug/debugContext";
 import * as SDK from "../index";
+import { executionContextManager } from "../cli/runtime/ExecutionContextManager";
 
 export interface TranspileResult {
   code: string;
@@ -28,6 +29,12 @@ export class ModuleSystem {
 
     if (this.debugContext) {
       this.debugContext.setModuleSystem(this);
+    }
+
+    // Ensure execution context manager is available globally for VM contexts
+    // This is set once and shared across all contexts
+    if (!(global as any).__flowwExecutionContextManager__) {
+      (global as any).__flowwExecutionContextManager__ = executionContextManager;
     }
   }
 
@@ -158,6 +165,8 @@ export class ModuleSystem {
       setInterval,
       Buffer,
       process,
+      // Inject execution context manager singleton to share across VM contexts
+      __flowwExecutionContextManager__: executionContextManager,
     };
 
     // Use debugContext to enhance the VM context if available

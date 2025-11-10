@@ -1,6 +1,7 @@
-import { Builtin } from "floww";
+import { Builtin, KVStore } from "floww";
 
 export const builtin = new Builtin();
+export const kv = new KVStore("default");
 
 // Type definitions for our data
 type User = {
@@ -37,8 +38,10 @@ builtin.triggers.onWebhook<{ action: string; userId?: string; name?: string; ema
           };
 
           // Store user in KV
-          await ctx.kv.set<User>("users", userId, user);
+          await kv.set<User>("users", userId, user);
           console.log(`✅ User created: ${name} (${userId})`);
+          const userTable = kv.getTable<User>("users")
+          await userTable.set(userId, user)
           break;
         }
 
@@ -49,7 +52,7 @@ builtin.triggers.onWebhook<{ action: string; userId?: string; name?: string; ema
           }
 
           // Retrieve user from KV
-          const user = await ctx.kv.get<User>("users", userId);
+          const user = await kv.get<User>("users", userId);
           console.log(`👤 User found:`, user);
           break;
         }
@@ -61,7 +64,7 @@ builtin.triggers.onWebhook<{ action: string; userId?: string; name?: string; ema
           }
 
           // Get existing user
-          const existingUser = await ctx.kv.get<User>("users", userId);
+          const existingUser = await kv.get<User>("users", userId);
 
           // Update fields
           const updatedUser: User = {
@@ -71,7 +74,7 @@ builtin.triggers.onWebhook<{ action: string; userId?: string; name?: string; ema
           };
 
           // Save updated user
-          await ctx.kv.set<User>("users", userId, updatedUser);
+          await kv.set<User>("users", userId, updatedUser);
           console.log(`✅ User updated: ${userId}`);
           break;
         }
@@ -82,14 +85,14 @@ builtin.triggers.onWebhook<{ action: string; userId?: string; name?: string; ema
             return;
           }
 
-          await ctx.kv.delete("users", userId);
+          await kv.delete("users", userId);
           console.log(`✅ User deleted: ${userId}`);
           break;
         }
 
         case "list-users": {
           // List all users
-          const users = await ctx.kv.listItems<User>("users");
+          const users = await kv.listItems<User>("users");
           console.log(`📋 Found ${users.length} user(s):`);
           users.forEach(item => {
             console.log(`  - ${item.value.name} (${item.key})`);
@@ -99,7 +102,7 @@ builtin.triggers.onWebhook<{ action: string; userId?: string; name?: string; ema
 
         case "list-tables": {
           // List all tables
-          const tables = await ctx.kv.listTables();
+          const tables = await kv.listTables();
           console.log(`📊 KV Store Tables:`, tables);
           break;
         }
@@ -137,11 +140,11 @@ builtin.triggers.onWebhook<{ sessionId?: string; userId?: string; ipAddress?: st
         ipAddress,
       };
 
-      await ctx.kv.set<SessionData>("sessions", sessionId, session);
+      await kv.set<SessionData>("sessions", sessionId, session);
       console.log(`🔐 Session created: ${sessionId} for user ${userId}`);
 
       // List all active sessions
-      const sessions = await ctx.kv.listItems<SessionData>("sessions");
+      const sessions = await kv.listItems<SessionData>("sessions");
       console.log(`📊 Active sessions: ${sessions.length}`);
     } catch (error) {
       if (error instanceof Error) {
@@ -160,8 +163,9 @@ builtin.triggers.onWebhook<{ increment?: number }>({
 
       // Try to get existing count
       try {
-        currentCount = await ctx.kv.get<number>("counters", "page-views");
+        currentCount = await kv.get<number>("counters", "page-views");
       } catch (error) {
+        console.log(error)
         // Key doesn't exist yet, start at 0
         console.log("Initializing counter...");
       }
@@ -171,7 +175,7 @@ builtin.triggers.onWebhook<{ increment?: number }>({
       const newCount = currentCount + increment;
 
       // Save new count
-      await ctx.kv.set<number>("counters", "page-views", newCount);
+      await kv.set<number>("counters", "page-views", newCount);
 
       console.log(`📈 Page views: ${currentCount} → ${newCount} (+${increment})`);
     } catch (error) {
@@ -196,14 +200,14 @@ builtin.triggers.onWebhook<{ key?: string; invalidate?: boolean }>({
 
       if (invalidate) {
         // Clear cache
-        await ctx.kv.delete("cache", key);
+        await kv.delete("cache", key);
         console.log(`🗑️  Cache invalidated: ${key}`);
         return;
       }
 
       // Try to get from cache
       try {
-        const cached = await ctx.kv.get<{ data: any; cachedAt: string }>("cache", key);
+        const cached = await kv.get<{ data: any; cachedAt: string }>("cache", key);
         const cacheAge = Date.now() - new Date(cached.cachedAt).getTime();
         const maxAge = 5 * 60 * 1000; // 5 minutes
 
@@ -225,7 +229,7 @@ builtin.triggers.onWebhook<{ key?: string; invalidate?: boolean }>({
       };
 
       // Store in cache
-      await ctx.kv.set("cache", key, {
+      await kv.set("cache", key, {
         data: freshData,
         cachedAt: new Date().toISOString(),
       });

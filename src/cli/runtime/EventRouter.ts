@@ -13,9 +13,8 @@ import { CronEventProducer } from "./eventProducers/cronEventProducer";
 import { WebSocketEventProducer } from "./eventProducers/websocketEventProducer";
 import { DebugContext } from "@/codeExecution";
 import { logger } from "../utils/logger";
-import { KVStore } from "../../kv";
-import { getConfig } from "../config/configUtils";
 import { ExecutionContext } from "./ExecutionContext";
+import { executionContextManager } from "./ExecutionContextManager";
 import { getAuthToken } from "../auth/tokenUtils";
 
 /**
@@ -109,11 +108,10 @@ export class EventRouter {
   }
 
   /**
-   * Create context object with KV store
-   * Extracts execution context from event data and passes to services
+   * Create context object and set up execution context
+   * Extracts execution context from event data and makes it globally available
    */
   private async createContext(event?: any): Promise<WebhookContext | CronContext | RealtimeContext> {
-    const config = getConfig();
     const executionContext = ExecutionContext.fromEvent(event);
 
     // If no workflow auth token from event, use CLI user's token as fallback (for dev mode)
@@ -124,8 +122,17 @@ export class EventRouter {
       }
     }
 
-    const kv = new KVStore(config.backendUrl, executionContext);
-    return { kv };
+    // Set backend URL from environment variable or default if not already set from event
+    if (!executionContext.getBackendUrl()) {
+      const backendUrl = process.env.FLOWW_BACKEND_URL || 'https://api.usefloww.dev';
+      executionContext.setBackendUrl(backendUrl);
+    }
+
+    // Set execution context globally so providers can access it
+    executionContextManager.setContext(executionContext);
+
+    // Return empty base context - providers are instantiated directly
+    return {};
   }
 
   /**
@@ -212,6 +219,9 @@ export class EventRouter {
 
         // Set flag to add separator before next execution
         this.needsSeparator = true;
+      } finally {
+        // Clear execution context after handler completes
+        executionContextManager.clearContext();
       }
     });
   }

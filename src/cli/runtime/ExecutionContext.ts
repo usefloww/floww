@@ -16,6 +16,8 @@ export interface ExecutionContextData {
   authToken?: string;
   /** Workflow ID for the current execution */
   workflowId?: string;
+  /** Backend URL for API calls */
+  backendUrl?: string;
   /** Extensible storage for additional internal data */
   [key: string]: any;
 }
@@ -56,6 +58,20 @@ export class ExecutionContext {
   }
 
   /**
+   * Get the backend URL
+   */
+  getBackendUrl(): string | undefined {
+    return this.data.backendUrl;
+  }
+
+  /**
+   * Set the backend URL
+   */
+  setBackendUrl(url: string): void {
+    this.data.backendUrl = url;
+  }
+
+  /**
    * Get a custom value from the context
    */
   get<T = any>(key: string): T | undefined {
@@ -91,6 +107,11 @@ export class ExecutionContext {
     // Extract workflow ID if present
     if (event?.workflow_id) {
       contextData.workflowId = event.workflow_id;
+    }
+
+    // Extract backend URL if present
+    if (event?.backend_url) {
+      contextData.backendUrl = event.backend_url;
     }
 
     // Add more field mappings here as needed

@@ -7,13 +7,17 @@ export * from "./providers/gitlab";
 export * from "./providers/jira";
 export * from "./providers/slack";
 export * from "./providers/todoist";
+export * from "./providers/kvstore";
 export * from "./providers/ai";
 
 // Code execution exports
 export * from "./codeExecution";
 
-// KV Store exports
+// KV Store types (KVStore provider is exported above)
 export * from "./kv";
 
 // AI utilities namespace
 export * as ai from "./ai";
+
+// Export execution context manager singleton for internal use
+export { executionContextManager } from "./cli/runtime/ExecutionContextManager";
