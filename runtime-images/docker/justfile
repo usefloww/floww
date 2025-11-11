@@ -13,6 +13,69 @@ run:
 test:
     #!/bin/bash
     set -euo pipefail
-    # Test the health endpoint
+
+    CONTAINER_NAME="floww-docker-runtime-test"
+    IMAGE_NAME="floww-docker-runtime"
+
+    # Cleanup function
+    cleanup() {
+        echo "Cleaning up..."
+        docker stop $CONTAINER_NAME 2>/dev/null || true
+        docker rm $CONTAINER_NAME 2>/dev/null || true
+    }
+
+    # Ensure cleanup on exit
+    trap cleanup EXIT
+
+    # Clean up any existing container
+    cleanup
+
+    echo "Building Docker image..."
+    docker build --platform=linux/amd64 --provenance=false -f {{justfile_directory()}}/Dockerfile -t $IMAGE_NAME {{justfile_directory()}}/../../
+
+    echo "Starting container..."
+    docker run -d --name $CONTAINER_NAME -p 8000:8000 $IMAGE_NAME
+
+    echo "Waiting for container to be ready..."
+    for i in {1..30}; do
+        if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+            echo "Container is ready!"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo "Container failed to become ready"
+            exit 1
+        fi
+        sleep 1
+    done
+
+    echo ""
     echo "Testing health endpoint..."
-    curl -f http://localhost:8000/health || echo "Container not running or health check failed"
+    HEALTH_RESPONSE=$(curl -sf http://localhost:8000/health)
+    echo "Response: $HEALTH_RESPONSE"
+
+    # Validate health response structure
+    if echo "$HEALTH_RESPONSE" | jq -e '.status == "ok"' > /dev/null; then
+        echo "✓ Health check passed"
+    else
+        echo "✗ Health check failed: invalid response structure"
+        exit 1
+    fi
+
+    echo ""
+    echo "Testing execute endpoint..."
+    EXEC_RESPONSE=$(curl -sf -X POST http://localhost:8000/execute \
+        -H "Content-Type: application/json" \
+        -d @{{justfile_directory()}}/test/webhook-payload.json)
+    echo "Response: $EXEC_RESPONSE"
+
+    # Validate execute response structure
+    if echo "$EXEC_RESPONSE" | jq -e '.statusCode == 200 and .message and .triggersProcessed != null' > /dev/null; then
+        echo "✓ Execute endpoint passed"
+    else
+        echo "✗ Execute endpoint failed: invalid response structure"
+        exit 1
+    fi
+
+    echo ""
+    echo "All tests passed! ✓"

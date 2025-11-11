@@ -13,7 +13,7 @@ RUN esbuild src/server.ts \
   --outfile=server.mjs
 
 # ---- runtime stage ----
-FROM node:22-slim
+FROM node:22-slim AS runtime
 
 # Install minimal runtime dependencies
 WORKDIR /app
@@ -36,3 +36,9 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Start the server
 CMD ["node", "server.mjs"]
+
+FROM runtime AS example
+
+RUN echo '{"type":"module","dependencies":{"floww":"*","fastify":"^5.2.0"}}' > package.json && \
+    npm install
+    

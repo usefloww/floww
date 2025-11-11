@@ -12,10 +12,16 @@ RUN esbuild src/handler.ts \
   --outfile=handler.mjs
 
 # ---- runtime stage ----
-FROM public.ecr.aws/lambda/nodejs:22
+FROM public.ecr.aws/lambda/nodejs:22 AS runtime
 
 # copy just what you need
 COPY --from=build /app/handler.mjs /var/task/bootstrap.mjs
 RUN echo '{"type":"module"}' > /var/task/package.json
 
 CMD [ "bootstrap.handler" ]
+
+
+FROM runtime AS example
+
+RUN echo '{"type":"module","dependencies":{"floww":"*","fastify":"^5.2.0"}}' > package.json && \
+    npm install

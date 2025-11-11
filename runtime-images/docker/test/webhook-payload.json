@@ -1,0 +1,15 @@
+{
+  "userCode": {
+    "main.ts": "import { builtin } from 'floww';\n\nbuiltin.triggers.onWebhook({ path: '/test', method: 'POST' }, async (ctx, event) => {\n  console.log('Webhook triggered!', event);\n  return { success: true };\n});"
+  },
+  "triggerType": "webhook",
+  "path": "/test",
+  "method": "POST",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "test": "data"
+  },
+  "query": {}
+}
