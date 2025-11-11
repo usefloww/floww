@@ -42,4 +42,12 @@ export default defineConfig([
     outDir: 'dist/ai',
     clean: false,
   },
+  // Runtime module build
+  {
+    entry: ['src/runtime/index.ts'],
+    format: ['cjs', 'esm'],
+    dts: true,
+    outDir: 'dist/runtime',
+    clean: false,
+  },
 ]);

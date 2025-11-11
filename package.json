@@ -1,6 +1,6 @@
 {
   "name": "floww",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "SDK for building trigger-based workflows",
   "type": "module",
   "repository": {
@@ -23,6 +23,11 @@
       "types": "./dist/ai/index.d.ts",
       "import": "./dist/ai/index.js",
       "require": "./dist/ai/index.cjs"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./dist/runtime/index.js",
+      "require": "./dist/runtime/index.cjs"
     }
   },
   "files": [
