@@ -2,3 +2,7 @@ workflowId: e129551b-db40-4c6f-87c2-004ec10f172d
 name: gitlab
 version: 1.0.0
 entrypoint: main.ts
+build:
+  type: docker
+  context: ../..
+  dockerfile: ../Dockerfile
