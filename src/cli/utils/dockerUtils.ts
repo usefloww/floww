@@ -1,5 +1,7 @@
 import { execa } from "execa";
-import { logger, ICONS } from "./logger";
+import path from "path";
+import { logger } from "./logger";
+import { ProjectConfig, BuildConfig } from "../config/projectConfig";
 
 export interface DockerBuildResult {
   localImage: string;
@@ -13,7 +15,7 @@ export async function dockerRetagImage(args: {
 }
 
 export async function dockerBuildImage(
-  projectConfig: any,
+  projectConfig: ProjectConfig,
   projectDir: string,
 ): Promise<DockerBuildResult> {
   const workloadId = projectConfig.workflowId || "unknown";
@@ -21,25 +23,45 @@ export async function dockerBuildImage(
 
   try {
     // Build the image for x86_64 (Lambda architecture)
-    // Check if we're in SDK examples (monorepo) - use parent context to access SDK source
+
+    // Get build configuration (with defaults)
+    const buildConfig: Partial<BuildConfig> = projectConfig.build || {};
+    const context = buildConfig.context || ".";
+    const dockerfile = buildConfig.dockerfile || "./Dockerfile";
+    const extraOptions = buildConfig.extra_options || [];
+
+    // Resolve paths relative to project directory
+    const contextPath = path.resolve(projectDir, context);
+    const dockerfilePath = path.resolve(projectDir, dockerfile);
+
+    // Check if we're in SDK examples (monorepo) - override context if needed
     const isInSdkExamples = projectDir.includes("/examples/");
+    const finalContextPath = isInSdkExamples && !buildConfig.context
+      ? `${projectDir}/../..`  // Use SDK root for examples if no custom context
+      : contextPath;
 
-    let buildCmd: string;
-    let buildCwd: string;
+    const finalDockerfilePath = isInSdkExamples && !buildConfig.dockerfile
+      ? path.join(projectDir, "Dockerfile")  // Use project Dockerfile for examples
+      : dockerfilePath;
 
-    if (isInSdkExamples) {
-      // In monorepo: use SDK root as context
-      buildCmd = `docker build --platform=linux/amd64 --provenance=false -f "${projectDir}/Dockerfile" -t "${localImage}" .`;
-      buildCwd = `${projectDir}/../..`;
-    } else {
-      // External project: use project directory as context
-      buildCmd = `docker build --platform=linux/amd64 --provenance=false -t "${localImage}" .`;
-      buildCwd = projectDir;
-    }
+    // Build Docker command with custom options
+    const extraFlags = extraOptions.join(" ");
+    const buildCmd = [
+      "docker build",
+      "--platform=linux/amd64",
+      "--provenance=false",
+      `-f "${finalDockerfilePath}"`,
+      extraFlags,
+      `-t "${localImage}"`,
+      `"${finalContextPath}"`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    logger.debugInfo(`Building image with command: ${buildCmd}`);
 
     // Run Docker build asynchronously and stream output
     const subprocess = execa(buildCmd, {
-      cwd: buildCwd,
       shell: true,
       all: true,
     });

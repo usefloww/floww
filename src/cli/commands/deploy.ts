@@ -4,6 +4,7 @@ import {
   loadProjectConfig,
   hasProjectConfig,
   updateProjectConfig,
+  ProjectConfig,
 } from "../config/projectConfig";
 import {
   ImageAlreadyExistsError,
@@ -45,7 +46,21 @@ ENV FLOWW_ENTRYPOINT=main.ts
 # SDK must be listed in package.json dependencies
 `;
 
-function ensureDockerfile(projectDir: string, projectConfig: any): string {
+function ensureDockerfile(
+  projectDir: string,
+  projectConfig: ProjectConfig
+): string {
+  // If build config specifies dockerfile, use it (already validated by loadProjectConfig)
+  if (projectConfig.build?.dockerfile) {
+    const dockerfilePath = path.resolve(
+      projectDir,
+      projectConfig.build.dockerfile
+    );
+    logger.debugInfo(`Using Dockerfile from build config: ${dockerfilePath}`);
+    return dockerfilePath;
+  }
+
+  // Otherwise, fall back to default behavior (create if missing)
   const dockerfilePath = path.join(projectDir, "Dockerfile");
 
   if (!fs.existsSync(dockerfilePath)) {

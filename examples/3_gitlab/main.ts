@@ -1,10 +1,15 @@
-import { Gitlab } from "floww";
+import { Builtin } from "floww";
 
-const gitlab = new Gitlab("asdfasdf");
+export const builtin = new Builtin();
 
-gitlab.triggers.onMergeRequest({
-  projectId: "19677180",
-  handler: async (ctx, event) => {
-    console.log(event.body.reviewers);
+type CustomBody = {
+  message: string;
+};
+
+builtin.triggers.onWebhook<CustomBody>({
+  handler: (ctx, event) => {
+    console.log("Webhook received:", event.body.message);
+    console.log("Headers:", event.headers);
   },
+  path: "/custom",
 });

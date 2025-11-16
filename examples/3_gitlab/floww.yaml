@@ -1,4 +1,4 @@
-workflowId: 20eb9449-9c5a-41eb-95e1-d2ee78f08c9d
-name: Gitlab
-description: Gitlab Example
+workflowId: e129551b-db40-4c6f-87c2-004ec10f172d
+name: gitlab
 version: 1.0.0
+entrypoint: main.ts

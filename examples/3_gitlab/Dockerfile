@@ -1,10 +1,8 @@
-FROM base-floww
+FROM ghcr.io/usefloww/docker-runtime:0.0.13
 
 # Build context is SDK root, copy pre-built SDK tarball
 COPY floww-*.tgz /tmp/
 
-# Setup /var/task with SDK
-WORKDIR /var/task
 # Create a minimal package.json for npm to work correctly
 RUN echo '{"type":"module","dependencies":{"floww":"*"}}' > package.json && \
     npm install /tmp/floww-*.tgz && \

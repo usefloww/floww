@@ -2,12 +2,20 @@ import fs from "fs";
 import path from "path";
 import yaml from "js-yaml";
 
+export interface BuildConfig {
+  type: "docker"; // Future-proof for other build types
+  context?: string; // Relative path to build context (default: ".")
+  dockerfile?: string; // Relative path to Dockerfile (default: "./Dockerfile")
+  extra_options?: string[]; // Additional Docker CLI flags
+}
+
 export interface ProjectConfig {
   workflowId?: string;
   name: string;
   description?: string;
   version?: string;
   entrypoint?: string;
+  build?: BuildConfig; // Optional build configuration
 }
 
 const CONFIG_FILENAME = "floww.yaml";
@@ -25,6 +33,60 @@ export function getProjectConfigPath(dir: string = process.cwd()): string {
 export function hasProjectConfig(dir: string = process.cwd()): boolean {
   const configPath = getProjectConfigPath(dir);
   return fs.existsSync(configPath);
+}
+
+/**
+ * Validate build configuration paths and options
+ * @throws Error if validation fails
+ */
+function validateBuildConfig(
+  buildConfig: BuildConfig,
+  projectDir: string,
+): void {
+  // Validate build type
+  if (buildConfig.type !== "docker") {
+    throw new Error(
+      `Unsupported build type: ${buildConfig.type}. Only 'docker' is supported.`,
+    );
+  }
+
+  // Validate context path if specified
+  if (buildConfig.context) {
+    const contextPath = path.resolve(projectDir, buildConfig.context);
+    if (!fs.existsSync(contextPath)) {
+      throw new Error(
+        `Build context not found: ${buildConfig.context} (resolved to ${contextPath})`,
+      );
+    }
+    if (!fs.statSync(contextPath).isDirectory()) {
+      throw new Error(
+        `Build context must be a directory: ${buildConfig.context}`,
+      );
+    }
+  }
+
+  // Validate dockerfile path if specified
+  if (buildConfig.dockerfile) {
+    const dockerfilePath = path.resolve(projectDir, buildConfig.dockerfile);
+    if (!fs.existsSync(dockerfilePath)) {
+      throw new Error(
+        `Dockerfile not found: ${buildConfig.dockerfile} (resolved to ${dockerfilePath})`,
+      );
+    }
+    if (!fs.statSync(dockerfilePath).isFile()) {
+      throw new Error(
+        `Dockerfile must be a file: ${buildConfig.dockerfile}`,
+      );
+    }
+  }
+
+  // Validate extra_options is an array if specified
+  if (
+    buildConfig.extra_options &&
+    !Array.isArray(buildConfig.extra_options)
+  ) {
+    throw new Error("build.extra_options must be an array of strings");
+  }
 }
 
 /**
@@ -47,6 +109,11 @@ export function loadProjectConfig(dir: string = process.cwd()): ProjectConfig {
     // Validate required fields
     if (!config.name) {
       throw new Error("floww.yaml is missing required field: name");
+    }
+
+    // Validate build config if present
+    if (config.build) {
+      validateBuildConfig(config.build, dir);
     }
 
     return config;

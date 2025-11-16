@@ -4,6 +4,8 @@ import {
   initProjectConfig,
   hasProjectConfig,
   getProjectConfigPath,
+  updateProjectConfig,
+  BuildConfig,
 } from "../config/projectConfig";
 import { fetchNamespaces } from "../api/apiMethods";
 import { logger } from "../utils/logger";
@@ -201,6 +203,37 @@ export default [
 }
 
 /**
+ * Search for existing Dockerfile in parent directories up to git root
+ * @returns Absolute path to Dockerfile if found, null otherwise
+ */
+function findDockerfileInParents(startDir: string): string | null {
+  let currentDir = startDir;
+
+  while (true) {
+    // Check for Dockerfile in current directory
+    const dockerfilePath = path.join(currentDir, "Dockerfile");
+    if (fs.existsSync(dockerfilePath)) {
+      return dockerfilePath;
+    }
+
+    // Check for .git to stop at git root
+    const gitPath = path.join(currentDir, ".git");
+    if (fs.existsSync(gitPath)) {
+      // Reached git root without finding Dockerfile
+      return null;
+    }
+
+    // Move up one directory
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      // Reached filesystem root without finding Dockerfile
+      return null;
+    }
+    currentDir = parentDir;
+  }
+}
+
+/**
  * Scaffold a complete new project with all necessary files
  */
 async function scaffoldProject(projectDir: string, projectName: string) {
@@ -214,10 +247,41 @@ async function scaffoldProject(projectDir: string, projectName: string) {
   createPackageJson(packageJsonPath, projectName);
   logger.success("Created package.json");
 
-  // Create Dockerfile
-  const dockerfilePath = path.join(projectDir, "Dockerfile");
-  createDockerfile(dockerfilePath);
-  logger.success("Created Dockerfile");
+  // Check for existing Dockerfile in parent directories
+  const existingDockerfile = findDockerfileInParents(path.dirname(projectDir));
+  let shouldUseExisting = false;
+
+  if (existingDockerfile) {
+    const relativeDockerfilePath = path.relative(projectDir, existingDockerfile);
+    logger.info(`Found Dockerfile at: ${relativeDockerfilePath}`);
+    shouldUseExisting = await logger.confirm(
+      "Would you like to use this existing Dockerfile?"
+    );
+  }
+
+  if (shouldUseExisting && existingDockerfile) {
+    // Calculate relative paths for build config
+    const dockerfileDir = path.dirname(existingDockerfile);
+    const relativeDockerfilePath = path.relative(projectDir, existingDockerfile);
+    const relativeContextPath = path.relative(projectDir, dockerfileDir);
+
+    // Update floww.yaml with build config
+    const buildConfig: BuildConfig = {
+      type: "docker",
+      context: relativeContextPath,
+      dockerfile: relativeDockerfilePath,
+    };
+
+    updateProjectConfig({ build: buildConfig }, projectDir);
+    logger.success(
+      `Configured to use existing Dockerfile at ${relativeDockerfilePath}`
+    );
+  } else {
+    // Create new Dockerfile in project directory
+    const dockerfilePath = path.join(projectDir, "Dockerfile");
+    createDockerfile(dockerfilePath);
+    logger.success("Created Dockerfile");
+  }
 
   // Create .gitignore
   const gitignorePath = path.join(projectDir, ".gitignore");
