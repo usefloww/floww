@@ -1,3 +1,11 @@
+<p align="center">
+  <a href="https://usefloww.dev">
+    <picture>
+      <img alt="Floww logo" src="./.github/assets/floww_logo_full.png">
+    </picture>
+  </a>
+</p>
+
 # Floww SDK
 
 **The code-first framework for building production-ready workflow automations.**
@@ -21,6 +29,20 @@ github.triggers.onPush({
 ```
 
 **Start building in 30 seconds →**
+
+**Join our community:** [Discord](https://discord.gg/D9bughShqn)
+
+## Features
+
+- 🔗 Connect any external service with webhook and event triggers
+- ⏰ Schedule workflows with cron expressions, no infrastructure needed
+- 🤖 Agent builder integrated with OpenAI, Anthropic, and Google AI
+- 🔥 Hot reload in development for instant feedback
+- 📝 100% TypeScript with full type safety and autocomplete
+- 🚀 One-command deployment to production-ready infrastructure
+- 🔌 Built-in providers for GitLab, Slack, Google Calendar, and more
+- 🧪 Local testing with real webhook URLs during development
+
 
 ## Prerequisites
 
@@ -55,14 +77,6 @@ floww dev
 floww deploy
 ```
 
-## Features
-
-- **Webhook Triggers** - Handle HTTP requests with custom paths and validation
-- **Cron Scheduling** - Run tasks on schedules using cron expressions
-- **AI Integration** - Built-in support for OpenAI, Anthropic, Google AI with tool calling
-- **TypeScript Native** - Full TypeScript support with type checking
-- **Auto-reload** - Hot reload in development mode
-- **Provider System** - Built-in integrations for GitLab, Google Calendar, Slack, and more
 
 ## Real-World Examples
 
@@ -344,6 +358,12 @@ This will:
 - Upload to Floww cloud
 - Provision infrastructure
 - Return a webhook URL
+
+## Community
+
+Join our Discord community to get help, share workflows, and connect with other developers:
+
+[Join Discord →](https://discord.gg/D9bughShqn)
 
 ## Documentation
 
