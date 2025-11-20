@@ -7,7 +7,7 @@ export class CronEventProducer implements EventProducer {
 
   async updateTriggers(
     triggers: Trigger[],
-    stream: EventStream,
+    stream: EventStream
   ): Promise<void> {
     // Stop all existing tasks
     this.tasks.forEach((task) => task.stop());
@@ -15,7 +15,7 @@ export class CronEventProducer implements EventProducer {
 
     // Filter cron triggers
     const cronTriggers = triggers.filter(
-      (t) => t.type === "cron",
+      (t) => t.type === "cron"
     ) as CronTrigger[];
 
     // Start new tasks
@@ -25,7 +25,8 @@ export class CronEventProducer implements EventProducer {
           scheduledTime: new Date(),
           actualTime: new Date(),
           __context: {
-            backend_url: process.env.FLOWW_BACKEND_URL || 'https://api.usefloww.dev',
+            backend_url:
+              process.env.FLOWW_BACKEND_URL || "https://app.usefloww.dev",
           },
         };
         stream.emit("data", { type: "cron", trigger, data: cronEvent });

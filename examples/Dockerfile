@@ -1,4 +1,4 @@
-FROM ghcr.io/usefloww/docker-runtime:0.0.13
+FROM ghcr.io/usefloww/lambda-runtime:0.0.13
 
 # Build context is SDK root, copy pre-built SDK tarball
 COPY floww-*.tgz /tmp/

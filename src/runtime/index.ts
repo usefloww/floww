@@ -222,10 +222,13 @@ export async function invokeTrigger(
       // Match on provider type, alias, trigger type, and input parameters
       const typeMatch = t._providerMeta.type === event.trigger.provider.type;
       const aliasMatch = t._providerMeta.alias === event.trigger.provider.alias;
-      const triggerTypeMatch = t._providerMeta.triggerType === event.trigger.trigger_type;
+      const triggerTypeMatch =
+        t._providerMeta.triggerType === event.trigger.trigger_type;
 
       // Deep equality check for input parameters
-      const inputMatch = JSON.stringify(t._providerMeta.input) === JSON.stringify(event.trigger.input);
+      const inputMatch =
+        JSON.stringify(t._providerMeta.input) ===
+        JSON.stringify(event.trigger.input);
 
       return typeMatch && aliasMatch && triggerTypeMatch && inputMatch;
     });
@@ -233,7 +236,9 @@ export async function invokeTrigger(
     if (matchingTriggers.length === 0) {
       console.log(
         `⚠️ No matching triggers found for provider: ${event.trigger.provider.type}:${event.trigger.provider.alias}, ` +
-        `trigger_type: ${event.trigger.trigger_type}, input: ${JSON.stringify(event.trigger.input)}`
+          `trigger_type: ${event.trigger.trigger_type}, input: ${JSON.stringify(
+            event.trigger.input
+          )}`
       );
     }
 

@@ -124,7 +124,7 @@ export const mockDevTriggerSyncResponse: DevTriggerSyncResponse = {
   webhooks: [
     {
       id: "webhook-123",
-      url: "https://api.usefloww.dev/webhooks/test-webhook-123",
+      url: "https://app.usefloww.dev/webhooks/test-webhook-123",
       path: "/webhook",
       method: "POST",
     },
@@ -154,7 +154,7 @@ export const mockPushTokenResponse: PushTokenResponse = {
   password: "mock-registry-token",
   expires_in: 3600,
   image_tag: "sha256:abcdef123456",
-  registry_url: "registry.usefloww.dev",
+  registry_url: "app.usefloww.dev",
 };
 
 // Mock Workflow Deployment Response
@@ -177,7 +177,7 @@ export const mockWorkflowDeploymentResponse: WorkflowDeploymentResponse = {
   webhooks: [
     {
       id: "webhook-456",
-      url: "https://api.usefloww.dev/webhooks/prod-webhook-456",
+      url: "https://app.usefloww.dev/webhooks/prod-webhook-456",
       path: "/api/webhook",
       method: "POST",
     },

@@ -49,13 +49,13 @@ vi.mock("../src/cli/auth/tokenUtils", () => ({
 
 vi.mock("../src/cli/auth/authUtils", () => ({
   loadActiveProfile: vi.fn(() => ({
-    backendUrl: "https://api.usefloww.dev",
+    backendUrl: "https://app.usefloww.dev",
     config: {
       auth: {
         provider: "workos",
         client_id: "client_test",
       },
-      websocket_url: "wss://ws.usefloww.dev/connection/websocket",
+      websocket_url: "wss://app.usefloww.dev/connection/websocket",
     },
     auth: {
       accessToken: "mock-access-token-123",
@@ -218,10 +218,8 @@ import { setConfig } from "../src/cli/config/configUtils";
 
 setConfig({
   workosClientId: "client_test",
-  backendUrl: "https://api.usefloww.dev",
+  backendUrl: "https://app.usefloww.dev",
   workosApiUrl: "https://api.workos.com",
-  websocketUrl: "wss://ws.usefloww.dev/connection/websocket",
-  registryUrl: "registry.usefloww.dev",
 });
 
 // Suppress console logs during tests (optional - uncomment if needed)

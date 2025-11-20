@@ -2,8 +2,6 @@ export interface FlowwConfig {
   workosClientId: string;
   backendUrl: string;
   workosApiUrl: string;
-  websocketUrl: string;
-  registryUrl: string;
 }
 
 export interface ConfigSource {
@@ -15,8 +13,6 @@ export interface ConfigWithSources {
   workosClientId: ConfigSource;
   backendUrl: ConfigSource;
   workosApiUrl: ConfigSource;
-  websocketUrl: ConfigSource;
-  registryUrl: ConfigSource;
 }
 
 interface ConfigField {
@@ -32,24 +28,14 @@ export const CONFIG_SCHEMA = {
     cliKey: "workos-client-id",
   },
   backendUrl: {
-    default: "https://api.usefloww.dev",
+    default: "https://app.usefloww.dev",
     envVar: "FLOWW_BACKEND_URL",
     cliKey: "backend-url",
-  },
-  websocketUrl: {
-    default: "wss://ws.usefloww.dev/connection/websocket",
-    envVar: "FLOWW_WEBSOCKET_URL",
-    cliKey: "websocket-url",
   },
   workosApiUrl: {
     default: "https://api.workos.com",
     envVar: "WORKOS_API_URL",
     cliKey: "workos-api-url",
-  },
-  registryUrl: {
-    default: "registry.usefloww.dev",
-    envVar: "FLOWW_REGISTRY_URL",
-    cliKey: "registry-url",
   },
 } as const satisfies Record<keyof FlowwConfig, ConfigField>;
 

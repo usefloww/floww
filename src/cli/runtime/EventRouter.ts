@@ -111,7 +111,9 @@ export class EventRouter {
    * Create context object and set up execution context
    * Extracts execution context from event data and makes it globally available
    */
-  private async createContext(event?: any): Promise<WebhookContext | CronContext | RealtimeContext> {
+  private async createContext(
+    event?: any
+  ): Promise<WebhookContext | CronContext | RealtimeContext> {
     const executionContext = ExecutionContext.fromEvent(event);
 
     // If no workflow auth token from event, use CLI user's token as fallback (for dev mode)
@@ -124,7 +126,8 @@ export class EventRouter {
 
     // Set backend URL from environment variable or default if not already set from event
     if (!executionContext.getBackendUrl()) {
-      const backendUrl = process.env.FLOWW_BACKEND_URL || 'https://api.usefloww.dev';
+      const backendUrl =
+        process.env.FLOWW_BACKEND_URL || "https://app.usefloww.dev";
       executionContext.setBackendUrl(backendUrl);
     }
 
@@ -199,7 +202,8 @@ export class EventRouter {
         const executionTime = Date.now() - startTime;
 
         // Get error message for display
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
 
         // Single error log with all info including error message
         logger.console.error(

@@ -15,18 +15,15 @@ export class WebhookEventProducer implements EventProducer {
   private webhooks: Map<string, WebhookMetadata> = new Map();
   private isServerStarted = false;
 
-  constructor(
-    private port: number,
-    private host: string,
-  ) {}
+  constructor(private port: number, private host: string) {}
 
   async updateTriggers(
     triggers: Trigger[],
-    stream: EventStream,
+    stream: EventStream
   ): Promise<void> {
     // Filter webhook triggers
     const webhookTriggers = triggers.filter(
-      (t) => t.type === "webhook",
+      (t) => t.type === "webhook"
     ) as WebhookTrigger[];
 
     // Call teardown on old triggers that are being removed
@@ -88,7 +85,7 @@ export class WebhookEventProducer implements EventProducer {
           } catch (err: any) {
             done(err, undefined);
           }
-        },
+        }
       );
 
       this.app.all("/webhook/*", async (request, reply) => {
@@ -106,7 +103,8 @@ export class WebhookEventProducer implements EventProducer {
           method: request.method,
           path: request.url,
           __context: {
-            backend_url: process.env.FLOWW_BACKEND_URL || 'https://api.usefloww.dev',
+            backend_url:
+              process.env.FLOWW_BACKEND_URL || "https://app.usefloww.dev",
           },
         };
 
@@ -124,13 +122,17 @@ export class WebhookEventProducer implements EventProducer {
           }
         }
 
-        stream.emit("data", { type: "webhook", trigger: webhookMeta.trigger, data: webhookEvent });
+        stream.emit("data", {
+          type: "webhook",
+          trigger: webhookMeta.trigger,
+          data: webhookEvent,
+        });
         return reply.code(200).send({ success: true });
       });
 
       await this.app.listen({ port: this.port, host: this.host });
       console.log(
-        `🌐 Webhook server listening on http://${this.host}:${this.port}`,
+        `🌐 Webhook server listening on http://${this.host}:${this.port}`
       );
       this.isServerStarted = true;
     }

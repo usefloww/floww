@@ -25,7 +25,7 @@ import {
 } from "./fixtures";
 
 // Backend API base URL (from configTypes.ts default)
-const BACKEND_URL = "https://api.usefloww.dev";
+const BACKEND_URL = "https://app.usefloww.dev";
 const WORKOS_URL = "https://api.workos.com";
 
 /**

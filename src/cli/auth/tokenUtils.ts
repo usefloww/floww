@@ -7,6 +7,7 @@ import {
 import { CLIAuth } from "./auth";
 import { StoredAuth } from "./authTypes";
 import { getConfig } from "../config/configUtils";
+import { getWebSocketUrl } from "../config/computedConfig";
 
 export async function getAuthToken(): Promise<string | null> {
   const auth = await getValidAuth();
@@ -99,8 +100,7 @@ async function refreshTokenLegacy(
         authorization_endpoint: `${apiUrl}/user_management/authorize`,
         issuer: `${apiUrl}/user_management`,
       },
-      websocket_url:
-        config.websocketUrl || "wss://ws.usefloww.dev/connection/websocket",
+      websocket_url: getWebSocketUrl(),
     });
     const refreshedAuth = await cliAuth.refreshAccessToken(auth.refreshToken);
 

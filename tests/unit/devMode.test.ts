@@ -223,7 +223,7 @@ describe("Dev Mode Unit Tests", () => {
 
       // 2. Create WebSocket connection
       const centrifuge = new MockCentrifuge(
-        "wss://ws.usefloww.dev/connection/websocket"
+        "wss://app.usefloww.dev/connection/websocket"
       );
       centrifuge.connect();
 
