@@ -7,6 +7,7 @@
 
 import { getMatchingTriggers } from "../userCode/utils";
 import { executeUserProject } from "../codeExecution";
+import { LogCapture } from "./logCapture";
 
 /**
  * Create wrapped project with auto-registration support
@@ -66,15 +67,24 @@ function createWrappedProject(
  * @param backendUrl - The backend URL to report to
  * @param executionId - The execution ID
  * @param authToken - Authentication token for the backend
- * @param error - Optional error details if execution failed
+ * @param options - Optional error details and logs
  */
 export async function reportExecutionStatus(
   backendUrl: string,
   executionId: string,
   authToken: string,
-  error?: { message: string; stack?: string }
+  options?: { error?: { message: string; stack?: string }; logs?: string }
 ) {
   try {
+    const body: { error?: { message: string; stack?: string }; logs?: string } =
+      {};
+    if (options?.error) {
+      body.error = options.error;
+    }
+    if (options?.logs) {
+      body.logs = options.logs;
+    }
+
     const response = await fetch(
       `${backendUrl}/api/executions/${executionId}/complete`,
       {
@@ -83,7 +93,7 @@ export async function reportExecutionStatus(
           Authorization: `Bearer ${authToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(error ? { error } : {}),
+        body: JSON.stringify(body),
       }
     );
 
@@ -310,6 +320,10 @@ export async function handleGetDefinitions(
 export async function invokeTrigger(
   event: InvokeTriggerEvent
 ): Promise<InvokeTriggerResult> {
+  const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+  const logCapture = new LogCapture();
+
+  logCapture.start();
   try {
     console.log("🚀 Floww Runtime - Processing event");
 
@@ -381,12 +395,17 @@ export async function invokeTrigger(
       executedCount++;
     }
 
+    // Stop capturing before reporting to exclude report logs from captured output
+    logCapture.stop();
+    const logs = logCapture.getLogs();
+
     // Report successful execution to backend if credentials provided
-    if (event.backendUrl && event.executionId && event.authToken) {
+     if (event.backendUrl && event.executionId && event.authToken) {
       await reportExecutionStatus(
         event.backendUrl,
         event.executionId,
-        event.authToken
+        event.authToken,
+        { logs }
       );
     }
 
@@ -397,6 +416,10 @@ export async function invokeTrigger(
     };
   } catch (error: any) {
     console.error("❌ Trigger execution failed:", error);
+
+    // Stop capturing before reporting to exclude report logs from captured output
+    logCapture.stop();
+    const logs = logCapture.getLogs();
 
     const errorDetails = {
       message: error.message,
@@ -409,7 +432,10 @@ export async function invokeTrigger(
         event.backendUrl,
         event.executionId,
         event.authToken,
-        errorDetails
+        {
+          error: errorDetails,
+          logs,
+        }
       );
     }
 
