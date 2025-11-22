@@ -1,6 +1,6 @@
 {
   "name": "floww",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "description": "SDK for building trigger-based workflows",
   "type": "module",
   "repository": {

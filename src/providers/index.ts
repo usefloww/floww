@@ -1,5 +1,7 @@
 export * from "./ai";
 export * from "./builtin";
+export * from "./github";
+export * from "./github/api";
 export * from "./gitlab";
 export * from "./gitlab/api";
 export * from "./jira";
