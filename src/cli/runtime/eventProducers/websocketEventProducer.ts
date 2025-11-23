@@ -3,6 +3,7 @@ import { RealtimeEvent, Trigger, RealtimeTrigger } from "../../../common";
 import { EventProducer, EventStream } from "../types";
 import { getAuthToken } from "../../auth/tokenUtils";
 import { getWebSocketUrl } from "@/cli/config/computedConfig";
+import { getMatchingTriggers } from "@/userCode/utils";
 
 export class WebSocketEventProducer implements EventProducer {
   private centrifuge: Centrifuge | null = null;
@@ -117,44 +118,37 @@ export class WebSocketEventProducer implements EventProducer {
 
       devSubscription.on("publication", (ctx) => {
         if (ctx.data.type === "webhook") {
-          // Match trigger by metadata
-          const matchingTrigger = this.currentTriggers.find((t: any) => {
-            if (!t._providerMeta || !ctx.data.trigger_metadata) return false;
-
-            return (
-              t._providerMeta.type ===
-                ctx.data.trigger_metadata.provider_type &&
-              t._providerMeta.alias ===
-                ctx.data.trigger_metadata.provider_alias &&
-              t._providerMeta.triggerType ===
-                ctx.data.trigger_metadata.trigger_type &&
-              JSON.stringify(t._providerMeta.input) ===
-                JSON.stringify(ctx.data.trigger_metadata.input)
-            );
+          const matchingTriggers = getMatchingTriggers(this.currentTriggers, {
+            type: ctx.data.trigger_metadata.provider_type,
+            alias: ctx.data.trigger_metadata.provider_alias,
+            triggerType: ctx.data.trigger_metadata.trigger_type,
+            input: ctx.data.trigger_metadata.input,
           });
 
-          if (matchingTrigger) {
-            // Emit webhook event with matched trigger
-            this.currentStream!.emit("data", {
-              type: "webhook",
-              trigger: matchingTrigger,
-              data: {
-                body: ctx.data.body,
-                headers: ctx.data.headers,
-                query: ctx.data.query,
-                method: ctx.data.method,
-                path: ctx.data.path,
-                __context: {
-                  auth_token: ctx.data.auth_token, // Pass through workflow auth token from backend
-                  backend_url: ctx.data.backend_url, // Pass through backend URL from backend
-                },
-              },
-            });
-          } else {
+          if (matchingTriggers.length === 0) {
             console.warn(
-              `Received webhook event but no matching trigger found`,
+              `Received webhook event but no matching triggers found`,
               ctx.data.trigger_metadata
             );
+            return;
+          } else {
+            for (const trigger of matchingTriggers) {
+              this.currentStream!.emit("data", {
+                type: "webhook",
+                trigger: trigger,
+                data: {
+                  body: ctx.data.body,
+                  headers: ctx.data.headers,
+                  query: ctx.data.query,
+                  method: ctx.data.method,
+                  path: ctx.data.path,
+                  __context: {
+                    auth_token: ctx.data.auth_token, // Pass through workflow auth token from backend
+                    backend_url: ctx.data.backend_url, // Pass through backend URL from backend
+                  },
+                },
+              });
+            }
           }
         }
       });

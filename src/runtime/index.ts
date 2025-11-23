@@ -5,6 +5,7 @@
  * (Docker, Lambda, etc.) to invoke user-defined triggers.
  */
 
+import { getMatchingTriggers } from "../userCode/utils";
 import { executeUserProject } from "../codeExecution";
 
 /**
@@ -211,41 +212,11 @@ export async function invokeTrigger(
 
     console.log(`✅ Loaded ${triggers.length} trigger(s)`);
 
-    // Normalize input objects for order-independent comparison
-    // Removes undefined values and sorts keys for consistent comparison
-    const normalizeInput = (input: any) => {
-      const normalized: any = {};
-      Object.keys(input)
-        .sort()
-        .forEach((key) => {
-          if (input[key] !== undefined) {
-            normalized[key] = input[key];
-          }
-        });
-      return normalized;
-    };
-
-    // Provider-aware trigger matching
-    // Match triggers by provider metadata (type, alias, trigger_type, input)
-    const matchingTriggers = triggers.filter((t: any) => {
-      // Skip triggers without provider metadata
-      if (!t._providerMeta) {
-        return false;
-      }
-
-      // Match on provider type, alias, trigger type, and input parameters
-      const typeMatch = t._providerMeta.type === event.trigger.provider.type;
-      const aliasMatch = t._providerMeta.alias === event.trigger.provider.alias;
-      const triggerTypeMatch =
-        t._providerMeta.triggerType === event.trigger.triggerType;
-
-      // Deep equality check for input parameters (order-independent)
-      const registeredInput = normalizeInput(t._providerMeta.input);
-      const eventInput = normalizeInput(event.trigger.input);
-      const inputMatch =
-        JSON.stringify(registeredInput) === JSON.stringify(eventInput);
-
-      return typeMatch && aliasMatch && triggerTypeMatch && inputMatch;
+    const matchingTriggers = getMatchingTriggers(triggers, {
+      type: event.trigger.provider.type,
+      alias: event.trigger.provider.alias,
+      triggerType: event.trigger.triggerType,
+      input: event.trigger.input,
     });
 
     if (matchingTriggers.length === 0) {
