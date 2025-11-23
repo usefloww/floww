@@ -52,7 +52,7 @@ describe("Runtime Trigger Invocation", () => {
           type: "builtin",
           alias: "default",
         },
-        trigger_type: "onCron",
+        triggerType: "onCron",
         // Different expression - won't match
         input: { expression: "*/10 * * * *" },
       },
@@ -111,7 +111,7 @@ describe("Runtime Trigger Invocation", () => {
           type: "builtin",
           alias: "default", // Matches
         },
-        trigger_type: "onCron", // Matches
+        triggerType: "onCron", // Matches
         input: { expression: "*/5 * * * *" }, // Matches
       },
       data: { scheduledTime: "2024-01-01T00:00:00Z", text: "Hello world" },
@@ -126,6 +126,88 @@ describe("Runtime Trigger Invocation", () => {
     expect(testResults.eventData).toEqual({
       scheduledTime: "2024-01-01T00:00:00Z",
       text: "Hello world",
+    });
+
+    // Cleanup
+    delete (global as any).__testResults__;
+  });
+
+  it("should execute GitHub onPush trigger when trigger matches", async () => {
+    // Use a global variable to capture handler execution
+    const testResults: { called: boolean; eventData: any } = {
+      called: false,
+      eventData: null,
+    };
+
+    // Make testResults accessible from VM context
+    (global as any).__testResults__ = testResults;
+
+    // Real user code that registers a GitHub onPush trigger
+    const userCode = `
+      const { Discord, GitHub } = require('floww');
+
+      const discord = new Discord();
+      const github = new GitHub();
+
+      github.triggers.onPush({
+        branch: "main",
+        owner: "usefloww",
+        repository: "floww-dashboard",
+        handler: async (ctx, event) => {
+          // Capture execution for testing
+          if (typeof __testResults__ !== 'undefined') {
+            __testResults__.called = true;
+            __testResults__.eventData = event;
+          }
+          console.log("GitHub push handler executed", event);
+        },
+      });
+    `;
+
+    const event: InvokeTriggerEvent = {
+      userCode: {
+        files: {
+          "main.ts": userCode,
+        },
+        entrypoint: "main.ts",
+      },
+      trigger: {
+        provider: {
+          type: "github",
+          alias: "default",
+        },
+        triggerType: "onPush",
+        input: {
+          owner: "usefloww",
+          branch: "main",
+          repository: "floww-dashboard",
+        },
+      },
+      data: {
+        ref: "refs/heads/main",
+        before: "abc123",
+        after: "def456",
+        repository: {
+          name: "floww-dashboard",
+          full_name: "usefloww/floww-dashboard",
+        },
+      },
+    };
+
+    const result = await invokeTrigger(event);
+
+    expect(result.success).toBe(true);
+    expect(result.triggersProcessed).toBeGreaterThan(0);
+    expect(result.triggersExecuted).toBe(1); // Trigger should be executed
+    expect(testResults.called).toBe(true);
+    expect(testResults.eventData).toEqual({
+      ref: "refs/heads/main",
+      before: "abc123",
+      after: "def456",
+      repository: {
+        name: "floww-dashboard",
+        full_name: "usefloww/floww-dashboard",
+      },
     });
 
     // Cleanup

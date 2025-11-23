@@ -211,12 +211,25 @@ export async function invokeTrigger(
 
     console.log(`✅ Loaded ${triggers.length} trigger(s)`);
 
+    // Normalize input objects for order-independent comparison
+    // Removes undefined values and sorts keys for consistent comparison
+    const normalizeInput = (input: any) => {
+      const normalized: any = {};
+      Object.keys(input)
+        .sort()
+        .forEach((key) => {
+          if (input[key] !== undefined) {
+            normalized[key] = input[key];
+          }
+        });
+      return normalized;
+    };
+
     // Provider-aware trigger matching
     // Match triggers by provider metadata (type, alias, trigger_type, input)
     const matchingTriggers = triggers.filter((t: any) => {
       // Skip triggers without provider metadata
       if (!t._providerMeta) {
-        console.log(`⚠️ Trigger without provider metadata, skipping`);
         return false;
       }
 
@@ -226,10 +239,11 @@ export async function invokeTrigger(
       const triggerTypeMatch =
         t._providerMeta.triggerType === event.trigger.triggerType;
 
-      // Deep equality check for input parameters
+      // Deep equality check for input parameters (order-independent)
+      const registeredInput = normalizeInput(t._providerMeta.input);
+      const eventInput = normalizeInput(event.trigger.input);
       const inputMatch =
-        JSON.stringify(t._providerMeta.input) ===
-        JSON.stringify(event.trigger.input);
+        JSON.stringify(registeredInput) === JSON.stringify(eventInput);
 
       return typeMatch && aliasMatch && triggerTypeMatch && inputMatch;
     });
