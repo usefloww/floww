@@ -132,7 +132,7 @@ async function selectWorkflow(): Promise<string> {
     // Non-interactive mode: return first workflow
     const selectedWorkflow = workflows[0];
     logger.debugInfo(`Auto-selected workflow: ${selectedWorkflow.name}`);
-    logger.tip('Run "floww init" to set a default workflow for this project');
+    logger.tip('Run "npx floww init" to set a default workflow for this project');
     return selectedWorkflow.id;
   }
 }
@@ -197,7 +197,7 @@ export async function deployCommand() {
   // Check if user is authenticated
   const auth = await getValidAuth();
   if (!auth) {
-    logger.error("Not logged in. Run 'floww login' first.");
+    logger.error("Not logged in. Run 'npx floww login' first.");
     process.exit(1);
   }
 
@@ -281,7 +281,7 @@ export async function deployCommand() {
         "Workflow not found or inaccessible:",
         error instanceof Error ? error.message : error
       );
-      logger.tip('Run "floww init" to select a different workflow');
+      logger.tip('Run "npx floww init" to select a different workflow');
       process.exit(1);
     }
   }

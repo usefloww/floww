@@ -168,44 +168,60 @@ export async function initCommand(
 
       if (initMode === "new") {
         const dirName = path.basename(projectDir);
-        logger.plain("\nCreated files:");
-        logger.plain("  - floww.yaml");
-        logger.plain("  - main.ts");
-        logger.plain("  - package.json");
-        logger.plain("  - Dockerfile");
-        logger.plain("  - .dockerignore");
-        logger.plain("  - .gitignore");
-
         if (!workflowId) {
-          logger.plain("\nNext steps:");
-          logger.plain(`  1. cd ${dirName}`);
-          logger.plain("  2. npm install");
-          logger.plain("  3. Edit your workflow in main.ts");
-          logger.plain("  4. Login: floww login");
-          logger.plain("  5. Deploy: floww deploy");
-          logger.plain("  6. Start building! 🚀\n");
+          logger.plain(`
+Created files:
+  - floww.yaml
+  - main.ts
+  - package.json
+  - Dockerfile
+  - .dockerignore
+  - .gitignore
+
+Next steps:
+  1. cd ${dirName}
+  2. npm install
+  3. Edit your workflow in main.ts
+  4. Login: npx floww login
+  5. Deploy: npx floww deploy
+  6. Start building! 🚀
+`);
         } else {
-          logger.plain("\nNext steps:");
-          logger.plain(`  1. cd ${dirName}`);
-          logger.plain("  2. npm install");
-          logger.plain("  3. Edit your workflow in main.ts");
-          logger.plain("  4. Run: floww dev main.ts");
-          logger.plain("  5. Deploy: floww deploy");
-          logger.plain("  6. Start building! 🚀\n");
+          logger.plain(`
+Created files:
+  - floww.yaml
+  - main.ts
+  - package.json
+  - Dockerfile
+  - .dockerignore
+  - .gitignore
+
+Next steps:
+  1. cd ${dirName}
+  2. npm install
+  3. Edit your workflow in main.ts
+  4. Run: npx floww dev main.ts
+  5. Deploy: npx floww deploy
+  6. Start building! 🚀
+`);
         }
       } else {
         if (!workflowId) {
-          logger.plain("\nNext steps:");
-          logger.plain("  1. Edit your workflow in main.ts");
-          logger.plain("  2. Login: floww login");
-          logger.plain("  3. Deploy: floww deploy");
-          logger.plain("  4. Start building! 🚀\n");
+          logger.plain(`
+Next steps:
+  1. Edit your workflow in main.ts
+  2. Login: npx floww login
+  3. Deploy: npx floww deploy
+  4. Start building! 🚀
+`);
         } else {
-          logger.plain("\nNext steps:");
-          logger.plain("  1. Edit your workflow in main.ts");
-          logger.plain("  2. Run: floww dev main.ts");
-          logger.plain("  3. Deploy: floww deploy");
-          logger.plain("  4. Start building! 🚀\n");
+          logger.plain(`
+Next steps:
+  1. Edit your workflow in main.ts
+  2. Run: npx floww dev main.ts
+  3. Deploy: npx floww deploy
+  4. Start building! 🚀
+`);
         }
       }
     }

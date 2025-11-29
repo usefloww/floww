@@ -13,14 +13,16 @@
 Replace complex orchestration tools with simple TypeScript code. Build workflows that respond to webhooks, run on schedules, integrate with AI, and connect to external services - all with full type safety.
 
 ```typescript
-import { Github, Slack } from "floww";
+import { GitHub, Slack } from "floww";
 
-const github = new Github();
+const github = new GitHub();
 const slack = new Slack();
 
 github.triggers.onPush({
+  owner: "my-org",
+  repository: "my-repo",
   handler: async (ctx, event) => {
-    await slack.postMessage({
+    await slack.actions.sendMessage({
       channel: '#deployments',
       text: `🚀 New push to ${event.repository.name}`
     });
@@ -53,7 +55,7 @@ github.triggers.onPush({
 
 ## Quick Start
 
-1. Create new projecan 
+1. Create a new project
 
 ```bash
 npx floww init
@@ -68,13 +70,13 @@ npm install
 3. Start developing
 
 ```bash
-floww dev
+npx floww dev
 ```
 
 4. Deploy to production
 
 ```bash
-floww deploy
+npx floww deploy
 ```
 
 
@@ -221,7 +223,7 @@ builtin.triggers.onWebhook({
 
 ### Automatic Provider Detection
 
-Floww automatically detects which providers you're using in your code. When you run `floww dev` or `floww deploy`, you will be prompted to create those that don't exist yet
+Floww automatically detects which providers you're using in your code. When you run `npx floww dev` or `npx floww deploy`, you will be prompted to create those that don't exist yet
 
 
 ### Using Multiple Provider Instances
@@ -247,11 +249,15 @@ Each alias is configured separately with its own credentials.
 
 ### Available Providers
 - `builtin` - Webhooks and cron (no auth required)
+- `github` - GitHub events and API
 - `gitlab` - GitLab events and API
-- `google_calendar` - Google Calendar events
-- `openai` - AI models (GPT-4, GPT-3.5, etc.)
-- `anthropic` - Claude models
 - `slack` - Slack events and messaging
+- `discord` - Discord events and messaging
+- `jira` - Jira events and API
+- `todoist` - Todoist events and API
+- `openai` - AI models (GPT-4, GPT-4o, etc.)
+- `anthropic` - Claude models
+- `google` - Google AI models (Gemini)
 
 [See all providers →](https://usefloww.dev/docs/providers)
 
@@ -262,29 +268,28 @@ Each alias is configured separately with its own credentials.
 ```typescript
 import { Gitlab } from "floww";
 
-const gitlab = new Gitlab({
-  token: process.env.GITLAB_TOKEN
-});
+const gitlab = new Gitlab();
 
-gitlab.triggers.onPushEvent({
+gitlab.triggers.onMergeRequest({
+  projectId: "my-project-id",
   handler: (ctx, event) => {
-    console.log('Push to', event.ref);
+    console.log('MR:', event.object_attributes.title);
   }
 });
 ```
 
-### Google Calendar
+### GitHub
 
 ```typescript
-import { GoogleCalendar } from "floww";
+import { GitHub } from "floww";
 
-const calendar = new GoogleCalendar({
-  email: "user@example.com"
-});
+const github = new GitHub();
 
-calendar.triggers.onEventStart({
+github.triggers.onPullRequest({
+  owner: "my-org",
+  repository: "my-repo",
   handler: (ctx, event) => {
-    console.log('Event starting:', event.title);
+    console.log('PR:', event.pull_request.title);
   }
 });
 ```
@@ -294,13 +299,13 @@ calendar.triggers.onEventStart({
 ### Development Mode
 
 ```bash
-floww dev [file]        # Run with auto-reload (default: main.ts)
-floww dev --port 8080   # Custom port
+npx floww dev [file]        # Run with auto-reload (default: main.ts)
+npx floww dev --port 8080   # Custom port
 ```
 
 **How it works:**
 
-When you run `floww dev`, the CLI:
+When you run `npx floww dev`, the CLI:
 1. **Registers your triggers** on the Floww server (webhooks, cron schedules, etc.)
 2. **Routes events to your local machine** for execution
 3. **Watches for file changes** and hot-reloads your code
@@ -314,7 +319,7 @@ This means:
 **Example workflow:**
 ```bash
 # Start dev server
-floww dev
+npx floww dev
 
 # Your webhook is registered and you get a URL:
 # ✓ Webhook registered: https://app.usefloww.dev/webhook/w_abc123/custom
@@ -345,12 +350,12 @@ curl -X POST http://localhost:3000/webhooks/custom \
 
 2. Login from CLI:
 ```bash
-floww login
+npx floww login
 ```
 
 3. Deploy your workflow:
 ```bash
-floww deploy
+npx floww deploy
 ```
 
 This will:
