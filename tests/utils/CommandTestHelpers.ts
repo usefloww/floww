@@ -427,7 +427,7 @@ RUN echo ${name} > cache-buster.txt
     },
     {
       name: "floww.yaml",
-      content: `workflowId: 799e43a6-a238-4d7f-baa4-fe0ff223f786
+      content: `workflowId: 61a22650-e47e-42b0-b8a2-5ffbd0af34a0
 name: Test Workflow
 version: 1.0.0
 entrypoint: main.ts
@@ -467,7 +467,7 @@ export default [
   },
   {
     name: "floww.yaml",
-    content: `workflowId: 799e43a6-a238-4d7f-baa4-fe0ff223f786
+    content: `workflowId: 61a22650-e47e-42b0-b8a2-5ffbd0af34a0
 name: Test Workflow
 version: 1.0.0
 entrypoint: main.ts

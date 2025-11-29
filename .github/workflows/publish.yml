@@ -38,6 +38,10 @@ jobs:
 
       - name: Run tests
         run: pnpm run test:ci
+        env:
+          FLOWW_TOKEN: ${{ secrets.FLOWW_TOKEN }}
+          FLOWW_BACKEND_URL: https://app.usefloww.dev
+          FLOWW_WEBSOCKET_URL: wss://app.usefloww.dev/connection/websocket
 
       - name: Build package
         run: pnpm run build

@@ -30,8 +30,8 @@ describe("Dev Mode E2E Tests", () => {
 
   it("should load triggers", async () => {
     const command = commandSpace.backgroundCommand("dev");
-    await waitUntilStdout(command, "Watching:");
-    await waitUntilStdout(command, "Event routing started with 1 trigger(s)");
+    await waitUntilStdout(command, "Watching:", 5000);
+    await waitUntilStdout(command, "Event routing started with 1 trigger(s)", 15000);
   });
 
   it.todo("should reload when file changes", async () => {

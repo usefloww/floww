@@ -403,7 +403,7 @@ function createDockerfile(filePath: string) {
   const dockerfile = `FROM ghcr.io/usefloww/lambda-runtime:latest
 
 # Install project dependencies (including SDK)
-COPY package-lock.json* pnpm-lock.yaml* ./
+COPY package.json package-lock.json* pnpm-lock.yaml* ./
 RUN npm install --omit=dev
 
 # Set entrypoint from config
