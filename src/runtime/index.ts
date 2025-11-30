@@ -98,13 +98,21 @@ export async function reportExecutionStatus(
 }
 
 /**
+ * Base event interface with type discriminator
+ */
+export interface BaseEvent {
+  type: "invoke_trigger" | "get_definitions";
+}
+
+/**
  * Trigger invocation event payload
  *
  * Uses a type-agnostic design with clear separation between:
  * - Trigger identity (provider, trigger_type, input) - used for matching
  * - Event data (data) - passed to trigger handlers
  */
-export interface InvokeTriggerEvent {
+export interface InvokeTriggerEvent extends BaseEvent {
+  type: "invoke_trigger";
   // User code to execute
   userCode: {
     files: Record<string, string>;
@@ -151,6 +159,139 @@ export interface InvokeTriggerResult {
     message: string;
     stack?: string;
   };
+}
+
+/**
+ * Get definitions event payload
+ *
+ * Requests the trigger and provider definitions from user code
+ * without executing any triggers
+ */
+export interface GetDefinitionsEvent extends BaseEvent {
+  type: "get_definitions";
+
+  // User code to analyze
+  userCode: {
+    files: Record<string, string>;
+    entrypoint: string;
+  };
+
+  // Provider configurations (optional)
+  // Used to inject provider configs during code interpretation
+  providerConfigs?: Record<string, any>;
+}
+
+/**
+ * Get definitions result
+ */
+export interface GetDefinitionsResult {
+  success: boolean;
+  triggers: Array<{
+    provider: {
+      type: string;
+      alias: string;
+    };
+    triggerType: string;
+    input: any;
+  }>;
+  providers: Array<{
+    type: string;
+    alias: string;
+  }>;
+  error?: {
+    message: string;
+    stack?: string;
+  };
+}
+
+/**
+ * Get trigger and provider definitions from user code
+ *
+ * This function:
+ * 1. Wraps user code with provider config injection
+ * 2. Executes the wrapped project to extract registered triggers and providers
+ * 3. Returns definitions in a standardized format
+ *
+ * @param event - The get definitions event payload
+ * @returns Definitions result with triggers and providers
+ */
+export async function handleGetDefinitions(
+  event: GetDefinitionsEvent
+): Promise<GetDefinitionsResult> {
+  try {
+    console.log("🔍 Floww Runtime - Getting definitions");
+
+    // Extract user code from the event
+    if (!event.userCode) {
+      throw new Error("No userCode provided in event payload");
+    }
+
+    // Extract files and entrypoint
+    const files = event.userCode.files;
+    const entrypoint = event.userCode.entrypoint || "main.ts";
+
+    if (!files) {
+      throw new Error(
+        'userCode must have a "files" property with the code files'
+      );
+    }
+
+    console.log(`📂 Loading entrypoint: ${entrypoint}`);
+
+    // Extract provider configs from event (if provided)
+    const providerConfigs = event.providerConfigs || {};
+
+    // Create wrapped project with auto-registration support
+    const wrappedProject = createWrappedProject(
+      files,
+      entrypoint,
+      providerConfigs
+    );
+
+    // Execute wrapped project
+    const module = await executeUserProject(wrappedProject);
+    const triggers = module.triggers || module.default || [];
+    const providers = module.providers || {};
+
+    console.log(`✅ Found ${triggers.length} trigger(s)`);
+    console.log(`✅ Found ${Object.keys(providers).length} provider(s)`);
+
+    // Convert triggers to standardized format
+    const triggerDefinitions = triggers.map((trigger: any) => ({
+      provider: {
+        type: trigger._providerMeta.type,
+        alias: trigger._providerMeta.alias,
+      },
+      triggerType: trigger._providerMeta.triggerType,
+      input: trigger._providerMeta.input,
+    }));
+
+    // Convert providers to standardized format
+    const providerDefinitions = Object.values(providers).map(
+      (value: any) => ({
+        type: value.type,
+        alias: value.alias,
+      })
+    );
+
+    return {
+      success: true,
+      triggers: triggerDefinitions,
+      providers: providerDefinitions,
+    };
+  } catch (error: any) {
+    console.error("❌ Get definitions failed:", error);
+
+    return {
+      success: false,
+      triggers: [],
+      providers: [],
+      error: {
+        message: error.message,
+        stack: error.stack,
+      },
+    };
+  }
 }
 
 /**
@@ -278,5 +419,27 @@ export async function invokeTrigger(
       triggersExecuted: 0,
       error: errorDetails,
     };
+  }
+}
+
+/**
+ * Handle any runtime event by dispatching to the appropriate handler
+ *
+ * This is the main entry point for all runtime events. It routes events
+ * to the correct handler based on the event type.
+ *
+ * @param event - The runtime event (with type discriminator)
+ * @returns The appropriate result based on the event type
+ */
+export async function handleEvent(
+  event: InvokeTriggerEvent | GetDefinitionsEvent
+): Promise<InvokeTriggerResult | GetDefinitionsResult> {
+  switch (event.type) {
+    case "invoke_trigger":
+      return await invokeTrigger(event);
+    case "get_definitions":
+      return await handleGetDefinitions(event);
+    default:
+      throw new Error(`Unknown event type: ${(event as any).type}`);
   }
 }

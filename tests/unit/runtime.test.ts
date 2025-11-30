@@ -4,7 +4,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { invokeTrigger, InvokeTriggerEvent } from "../../src/runtime/index";
+import {
+  invokeTrigger,
+  InvokeTriggerEvent,
+  handleGetDefinitions,
+  GetDefinitionsEvent,
+} from "../../src/runtime/index";
 
 describe("Runtime Trigger Invocation", () => {
   beforeEach(() => {
@@ -209,6 +214,146 @@ describe("Runtime Trigger Invocation", () => {
         full_name: "usefloww/floww-dashboard",
       },
     });
+
+    // Cleanup
+    delete (global as any).__testResults__;
+  });
+});
+
+describe("Runtime Get Definitions", () => {
+  beforeEach(() => {
+    // Mock fetch globally to avoid network calls
+    global.fetch = vi.fn();
+  });
+
+  it("should extract trigger and provider definitions without executing triggers", async () => {
+    // Use a global variable to verify handlers are NOT executed
+    const testResults: { called: boolean } = {
+      called: false,
+    };
+
+    // Make testResults accessible from VM context
+    (global as any).__testResults__ = testResults;
+
+    // Real user code that registers multiple triggers and uses providers
+    const userCode = `
+      const { Builtin, GitHub, Discord } = require('floww');
+
+      const builtin = new Builtin();
+      const github = new GitHub();
+      const discord = new Discord({ credential: 'notifications' });
+
+      // Register a cron trigger
+      builtin.triggers.onCron({
+        expression: "*/5 * * * *",
+        handler: (ctx, event) => {
+          // This should NOT be executed during get_definitions
+          if (typeof __testResults__ !== 'undefined') {
+            __testResults__.called = true;
+          }
+          console.log("Cron handler executed");
+        },
+      });
+
+      // Register a webhook trigger
+      builtin.triggers.onWebhook({
+        path: "/webhook",
+        method: "POST",
+        handler: (ctx, event) => {
+          // This should NOT be executed during get_definitions
+          if (typeof __testResults__ !== 'undefined') {
+            __testResults__.called = true;
+          }
+          console.log("Webhook handler executed");
+        },
+      });
+
+      // Register a GitHub push trigger
+      github.triggers.onPush({
+        branch: "main",
+        owner: "usefloww",
+        repository: "floww-dashboard",
+        handler: async (ctx, event) => {
+          // This should NOT be executed during get_definitions
+          if (typeof __testResults__ !== 'undefined') {
+            __testResults__.called = true;
+          }
+          console.log("GitHub push handler executed");
+        },
+      });
+    `;
+
+    const event: GetDefinitionsEvent = {
+      type: "get_definitions",
+      userCode: {
+        files: {
+          "main.ts": userCode,
+        },
+        entrypoint: "main.ts",
+      },
+    };
+
+    const result = await handleGetDefinitions(event);
+
+    // Verify the result is successful
+    expect(result.success).toBe(true);
+
+    // Verify triggers were extracted
+    expect(result.triggers).toHaveLength(3);
+
+    // Verify the cron trigger definition
+    const cronTrigger = result.triggers.find((t) => t.triggerType === "onCron");
+    expect(cronTrigger).toBeDefined();
+    expect(cronTrigger?.provider.type).toBe("builtin");
+    expect(cronTrigger?.provider.alias).toBe("default");
+    expect(cronTrigger?.input).toEqual({ expression: "*/5 * * * *" });
+
+    // Verify the webhook trigger definition
+    const webhookTrigger = result.triggers.find(
+      (t) => t.triggerType === "onWebhook"
+    );
+    expect(webhookTrigger).toBeDefined();
+    expect(webhookTrigger?.provider.type).toBe("builtin");
+    expect(webhookTrigger?.provider.alias).toBe("default");
+    expect(webhookTrigger?.input).toEqual({ path: "/webhook", method: "POST" });
+
+    // Verify the GitHub push trigger definition
+    const githubTrigger = result.triggers.find(
+      (t) => t.triggerType === "onPush"
+    );
+    expect(githubTrigger).toBeDefined();
+    expect(githubTrigger?.provider.type).toBe("github");
+    expect(githubTrigger?.provider.alias).toBe("default");
+    expect(githubTrigger?.input).toEqual({
+      branch: "main",
+      owner: "usefloww",
+      repository: "floww-dashboard",
+    });
+
+    // Verify providers were extracted
+    expect(result.providers).toHaveLength(3);
+
+    // Check that all expected providers are present
+    const providerTypes = result.providers.map((p) => ({
+      type: p.type,
+      alias: p.alias,
+    }));
+
+    expect(providerTypes).toContainEqual({
+      type: "builtin",
+      alias: "default",
+    });
+    expect(providerTypes).toContainEqual({
+      type: "github",
+      alias: "default",
+    });
+    expect(providerTypes).toContainEqual({
+      type: "discord",
+      alias: "notifications",
+    });
+
+    // Most importantly: verify NO triggers were executed
+    expect(testResults.called).toBe(false);
 
     // Cleanup
     delete (global as any).__testResults__;

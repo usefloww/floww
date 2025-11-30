@@ -29,6 +29,7 @@ builtin.triggers.onWebhook<CustomBody>({
 
 // V2 payload format: type-agnostic with provider-aware matching
 const payloadObj = {
+    type: 'invoke_trigger',
     userCode: {
         files: {
             'main.ts': main
