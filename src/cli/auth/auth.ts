@@ -90,6 +90,10 @@ export class CLIAuth {
     }
 
     const fetch = await getFetch();
+    const extraParams: Record<string, string> = {};
+    if (this.config.auth.audience) {
+      extraParams.audience = this.config.auth.audience;
+    }
     const response = await fetch(
       this.config.auth.device_authorization_endpoint,
       {
@@ -99,6 +103,7 @@ export class CLIAuth {
         },
         body: new URLSearchParams({
           client_id: this.config.auth.client_id,
+          ...extraParams,
         }),
       }
     );

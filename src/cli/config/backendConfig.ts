@@ -6,6 +6,7 @@ export interface BaseAuthConfig {
   authorization_endpoint?: string;
   issuer?: string;
   jwks_uri?: string;
+  audience?: string;
 }
 
 export type AuthConfig = BaseAuthConfig;
