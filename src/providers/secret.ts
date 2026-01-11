@@ -86,13 +86,14 @@ export class Secret<T extends ZodRawShape> extends BaseProvider {
     if (type === 'boolean') return 'boolean';
 
     // Also check legacy _def.typeName for older Zod versions
-    const typeName = zodType._def?.typeName;
+    const def = zodType._def as any;
+    const typeName = def?.typeName;
     if (typeName === 'ZodNumber') return 'number';
     if (typeName === 'ZodBoolean') return 'boolean';
 
     // Handle wrapped types (optional, nullable, default)
     if (typeName === 'ZodOptional' || typeName === 'ZodNullable' || typeName === 'ZodDefault') {
-      return this.getDataType(zodType._def.innerType);
+      return this.getDataType(def.innerType);
     }
 
     return 'string';
