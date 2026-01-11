@@ -16,9 +16,8 @@ permissions:
   packages: write
 
 jobs:
-  test:
+  unit-tests:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +25,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -36,15 +34,37 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Run tests
-        run: pnpm run test:ci
+      - name: Run unit tests
+        run: pnpm test:ci:unit
+
+      - name: Build package
+        run: pnpm run build
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.9.0
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run integration tests
+        run: pnpm test:ci:integration
         env:
           FLOWW_TOKEN: ${{ secrets.FLOWW_TOKEN }}
           FLOWW_BACKEND_URL: https://app.usefloww.dev
           FLOWW_WEBSOCKET_URL: wss://app.usefloww.dev/connection/websocket
-
-      - name: Build package
-        run: pnpm run build
 
   publish-github:
     # needs: test
@@ -104,7 +124,7 @@ jobs:
         run: pnpm publish --access public --no-git-checks
 
   publish-npm:
-    needs: test
+    needs: unit-tests
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
