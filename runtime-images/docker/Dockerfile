@@ -37,8 +37,9 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Start the server
 CMD ["node", "server.mjs"]
 
-FROM runtime AS example
+FROM runtime AS default
 
-RUN echo '{"type":"module","dependencies":{"floww":"*","fastify":"^5.2.0"}}' > package.json && \
+ARG SDK_VERSION=latest
+RUN echo "{\"type\":\"module\",\"dependencies\":{\"floww\":\"${SDK_VERSION}\",\"fastify\":\"^5.6.0\"}}" > package.json && \
     npm install
     

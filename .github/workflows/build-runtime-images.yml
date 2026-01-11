@@ -10,6 +10,8 @@ env:
   REGISTRY: ghcr.io
   LAMBDA_IMAGE_NAME: usefloww/lambda-runtime
   DOCKER_IMAGE_NAME: usefloww/docker-runtime
+  LAMBDA_DEFAULT_IMAGE_NAME: usefloww/lambda-default
+  DOCKER_DEFAULT_IMAGE_NAME: usefloww/docker-default
 
 jobs:
   build-and-push:
@@ -65,10 +67,42 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
           provenance: false
 
+      - name: Build and push Lambda default image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./runtime-images/lambda/Dockerfile
+          target: default
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            SDK_VERSION=${{ steps.version.outputs.VERSION }}
+          tags: ${{ env.REGISTRY }}/${{ env.LAMBDA_DEFAULT_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          provenance: false
+
+      - name: Build and push Docker default image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./runtime-images/docker/Dockerfile
+          target: default
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            SDK_VERSION=${{ steps.version.outputs.VERSION }}
+          tags: ${{ env.REGISTRY }}/${{ env.DOCKER_DEFAULT_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          provenance: false
+
       - name: Summary
         run: |
           echo "✅ Successfully built and pushed runtime images:"
+          echo ""
+          echo "Base runtimes (no SDK):"
           echo "  - ${{ env.REGISTRY }}/${{ env.LAMBDA_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}"
           echo "  - ${{ env.REGISTRY }}/${{ env.LAMBDA_IMAGE_NAME }}:latest"
           echo "  - ${{ env.REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}"
           echo "  - ${{ env.REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest"
+          echo ""
+          echo "Default runtimes (with SDK ${{ steps.version.outputs.VERSION }}):"
+          echo "  - ${{ env.REGISTRY }}/${{ env.LAMBDA_DEFAULT_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}"
+          echo "  - ${{ env.REGISTRY }}/${{ env.DOCKER_DEFAULT_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}"

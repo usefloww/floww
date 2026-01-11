@@ -21,7 +21,8 @@ RUN echo '{"type":"module"}' > /var/task/package.json
 CMD [ "bootstrap.handler" ]
 
 
-FROM runtime AS example
+FROM runtime AS default
 
-RUN echo '{"type":"module","dependencies":{"floww":"*","fastify":"^5.2.0"}}' > package.json && \
+ARG SDK_VERSION=latest
+RUN echo "{\"type\":\"module\",\"dependencies\":{\"floww\":\"${SDK_VERSION}\"}}" > package.json && \
     npm install
