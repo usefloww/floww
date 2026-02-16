@@ -9,6 +9,7 @@ export default defineConfig([
     outDir: 'dist',
     clean: true,
     tsconfig: './tsconfig.json',
+    noExternal: ['@floww/api-contract'],
   },
   // CLI build
   {
@@ -34,7 +35,7 @@ export default defineConfig([
       'inquirer',
       'react',
     ],
-    noExternal: [],
+    noExternal: ['@floww/api-contract'],
   },
   // AI module build
   {

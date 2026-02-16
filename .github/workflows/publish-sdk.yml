@@ -120,6 +120,12 @@ jobs:
       - name: Build SDK
         run: pnpm --filter floww build
 
+      - name: Set npm authentication
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Check if version exists and publish
         working-directory: packages/sdk
         run: |

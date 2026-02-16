@@ -1,6 +1,6 @@
 {
   "name": "floww",
-  "version": "0.0.31",
+  "version": "0.0.32",
   "description": "SDK for building trigger-based workflows",
   "type": "module",
   "repository": {
@@ -109,10 +109,10 @@
     "open": "^10.2.0",
     "pino-pretty": "^13.1.2",
     "react": "^19.2.0",
-    "@floww/api-contract": "workspace:*",
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@floww/api-contract": "workspace:*",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.10.0",
     "@types/node-cron": "^3.0.11",

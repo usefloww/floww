@@ -27,6 +27,15 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // Map SDK subpath exports to source files so tests don't require a build
+      'floww/providers/server': path.resolve(__dirname, './packages/sdk/providers/server/index.ts'),
+      'floww/providers/constants': path.resolve(__dirname, './packages/sdk/providers/constants/index.ts'),
+      'floww/providers': path.resolve(__dirname, './packages/sdk/providers/index.ts'),
+      'floww/ai': path.resolve(__dirname, './packages/sdk/ai/index.ts'),
+      'floww/runtime': path.resolve(__dirname, './packages/sdk/runtime/index.ts'),
+      'floww/kv': path.resolve(__dirname, './packages/sdk/kv/index.ts'),
+      'floww/codeExecution': path.resolve(__dirname, './packages/sdk/codeExecution/index.ts'),
+      'floww': path.resolve(__dirname, './packages/sdk/index.ts'),
       '@': path.resolve(__dirname, './src'),
       '~': path.resolve(__dirname, './'),
     },

@@ -368,9 +368,6 @@ importers:
       '@clack/prompts':
         specifier: ^0.11.0
         version: 0.11.0
-      '@floww/api-contract':
-        specifier: workspace:*
-        version: link:../api-contract
       '@lydell/node-pty':
         specifier: ^1.1.0
         version: 1.1.0
@@ -444,6 +441,9 @@ importers:
         specifier: ^4.1.12
         version: 4.3.6
     devDependencies:
+      '@floww/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
