@@ -18,6 +18,12 @@ export default defineConfig({
         singleFork: true, // Run tests serially for transaction control
       },
     },
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      './e2e/**', // Exclude Playwright e2e tests (root e2e directory only)
+      '**/.{idea,git,cache,output,temp}/**',
+    ],
   },
   resolve: {
     alias: {

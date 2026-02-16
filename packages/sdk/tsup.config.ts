@@ -83,7 +83,7 @@ export default defineConfig([
   },
   // Providers constants module build
   {
-    entry: ['providers/constants.ts'],
+    entry: ['providers/constants/index.ts'],
     format: ['cjs', 'esm'],
     dts: true,
     outDir: 'dist/providers/constants',
