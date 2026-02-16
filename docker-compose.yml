@@ -1,0 +1,57 @@
+services:
+  # Run database migrations
+  migrations:
+    container_name: floww-dashboard-migrations
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      # Only need server code and drizzle config for migrations
+      - ./server:/app/server
+      - ./drizzle.config.ts:/app/drizzle.config.ts
+    command: sh -c "pnpm db:push && pnpm db:seed"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://admin:secret@db:5432/postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # Main database (development + test)
+  # Creates both 'postgres' (dev) and 'floww_test' (test) databases
+  db:
+    image: postgres:16-alpine
+    container_name: floww-dashboard-db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Centrifugo (WebSocket server)
+  centrifugo:
+    build:
+      context: ./centrifugo
+      dockerfile: Dockerfile
+    container_name: floww-dashboard-centrifugo
+    ports:
+      - "8000:8000"
+    environment:
+      CENTRIFUGO_API_KEY: floww-api-key-dev
+      CENTRIFUGO_ADMIN_ENABLED: "true"
+      CENTRIFUGO_ADMIN_INSECURE: "true"
+      CENTRIFUGO_ALLOWED_ORIGINS: '["http://localhost:3000", "http://localhost:5173"]'
+      CENTRIFUGO_ALLOW_ANONYMOUS: "true"
+      CENTRIFUGO_CONNECT_PROXY_ENDPOINT: "http://host.docker.internal:5173/api/centrifugo/connect"
+      CENTRIFUGO_SUBSCRIBE_PROXY_ENDPOINT: "http://host.docker.internal:5173/api/centrifugo/subscribe"
+    restart: unless-stopped

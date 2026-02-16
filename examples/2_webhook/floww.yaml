@@ -1,8 +1,0 @@
-workflowId: 1d4895a6-a83c-46c8-8739-9327fa012a7f
-name: test-webhook
-version: 1.0.0
-entrypoint: main.ts
-build:
-  type: docker
-  context: ../..
-  dockerfile: ../Dockerfile

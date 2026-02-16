@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_deployments" ADD COLUMN "provider_mappings" jsonb;

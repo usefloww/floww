@@ -1,0 +1,12 @@
+{
+  "name": "floww",
+  "description": "Write, test, and deploy workflow automations using the Floww SDK",
+  "version": "1.0.0",
+  "author": {
+    "name": "Floww"
+  },
+  "homepage": "https://floww.dev",
+  "repository": "https://github.com/usefloww/floww-dashboard",
+  "license": "MIT",
+  "keywords": ["floww", "automation", "workflows", "triggers", "deploy"]
+}

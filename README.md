@@ -1,23 +1,27 @@
 <p align="center">
-  <a href="https://usefloww.dev">
+  <a href="https://floww.dev">
     <picture>
       <img alt="Floww logo" src="./.github/assets/floww_logo_full.png" width="300">
     </picture>
   </a>
 </p>
 
-# Floww SDK
+# Floww Dashboard
 
-**The code-first framework for building production-ready workflow automations.**
+**The complete Floww platform - monorepo containing the web dashboard, API server, and Floww SDK.**
 
-Replace complex orchestration tools with simple TypeScript code. Build workflows that respond to webhooks, run on schedules, integrate with AI, and connect to external services - all with full type safety.
+This repository powers the Floww automation platform at [app.floww.dev](https://app.floww.dev), providing users with a code-first framework for building production-ready workflow automations.
+
+## What is Floww?
+
+Floww is a code-first framework for building production-ready workflow automations. Replace complex orchestration tools with simple TypeScript code. Build workflows that respond to webhooks, run on schedules, integrate with AI, and connect to external services - all with full type safety.
 
 ```typescript
 import { GitHub, Slack } from "floww";
 
 const github = new GitHub();
 const slack = new Slack();
-
+gs
 github.triggers.onPush({
   owner: "my-org",
   repository: "my-repo",
@@ -30,339 +34,94 @@ github.triggers.onPush({
 });
 ```
 
-**Start building in 30 seconds:** `npx floww init`
+## Repository Structure
 
-**Join our community:** [Discord](https://discord.gg/D9bughShqn)
+This is a monorepo containing:
+
+- **Dashboard** (`/src`, `/server`) - The web UI and backend API for managing workflows, providers, and deployments
+- **Floww SDK** (`/packages/sdk`) - The TypeScript SDK and CLI that developers use to build workflows
+- **Claude Plugin** (`/.claude-plugin`, `/skills`) - Official Claude Code plugin for building Floww automations
+- **Database** (`/server/db`) - PostgreSQL schema and migrations using Drizzle ORM
+- **Worker** (`/server/jobs`) - Background job processing with Graphile Worker
 
 ## Features
 
-- 🔗 Connect any external service with webhook and event triggers
-- ⏰ Schedule workflows with cron expressions, no infrastructure needed
-- 🤖 Agent builder integrated with OpenAI, Anthropic, and Google AI
-- 🔥 Hot reload in development for instant feedback
-- 📝 100% TypeScript with full type safety and autocomplete
-- 🚀 One-command deployment to production-ready infrastructure
-- 🔌 Built-in providers for GitLab, Slack, Google Calendar, and more
-- 🧪 Local testing with real webhook URLs during development
+### Dashboard & Platform
+- User authentication and account management
+- Workflow deployment and hosting infrastructure
+- Real-time workflow execution monitoring
+- Provider configuration and OAuth flows
+- Usage analytics and billing integration
+- Admin interface for platform management
 
+### Floww SDK
+- Connect any external service with webhook and event triggers
+- Schedule workflows with cron expressions, no infrastructure needed
+- Agent builder integrated with OpenAI, Anthropic, and Google AI
+- Hot reload in development for instant feedback
+- 100% TypeScript with full type safety and autocomplete
+- One-command deployment to production-ready infrastructure
+- Built-in providers for GitLab, Slack, Google Calendar, and more
+- Local testing with real webhook URLs during development
 
 ## Prerequisites
 
-- Node.js 18+ 
-- TypeScript 5.0 or higher
-- npm, pnpm, or yarn
-
+- Node.js 18+
+- PostgreSQL 14+
+- pnpm 8+
+- Docker (optional, for containerized development)
 
 ## Quick Start
 
-1. Create a new project
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed development setup instructions.
 
 ```bash
-npx floww init
+# Install dependencies
+pnpm install
+
+# Set up environment variables
+cp .env.example .env
+
+# Run database migrations
+pnpm db:migrate
+
+# Start the development server
+pnpm dev
+
+# In another terminal, start the worker
+pnpm worker
 ```
 
-2. Install dependencies
+## Claude Code Plugin
 
-```bash
-npm install
-```
+This repository includes the official Claude Code plugin for Floww, which helps Claude understand the Floww SDK and build workflow automations correctly.
 
-3. Start developing
+### Using the Plugin
 
-```bash
-npx floww dev
-```
+The plugin is located in the `.claude-plugin/` and `skills/` directories at the repository root. When you open this repository in Claude Code, the plugin is automatically available.
 
-4. Deploy to production
+The plugin activates when you:
+- Mention "automations", "workflows", or "triggers"
+- Ask Claude to help build Floww integrations
+- Use Floww SDK commands
 
-```bash
-npx floww deploy
-```
+### Plugin Features
 
+- Comprehensive provider documentation and examples
+- Correct patterns for triggers, actions, and AI integrations
+- Step-by-step guidance for scaffolding, testing, and deploying workflows
+- Support for all Floww providers (GitHub, Slack, Discord, Jira, GitLab, and more)
 
-## Real-World Examples
+For more information about the plugin, see `skills/floww/SKILL.md`.
 
-### Daily Reports
-```typescript
-import { Builtin } from "floww";
+## Documentation
 
-const builtin = new Builtin();
+For detailed documentation about using Floww, visit [floww.dev](https://floww.dev)
 
-builtin.triggers.onCron({
-  expression: "0 9 * * 1-5",  // Weekdays at 9 AM
-  handler: async (ctx) => {
-    const analytics = await fetchAnalytics();
-    await sendEmailReport(analytics);
-  }
-});
-```
-
-### AI-Powered Customer Support
-```typescript
-import { OpenAI, Builtin } from "floww";
-import { generateText } from "floww/ai";
-
-const openai = new OpenAI();
-const builtin = new Builtin();
-
-builtin.triggers.onWebhook({
-  path: '/support',
-  handler: async (ctx, event) => {
-    const response = await generateText({
-      model: openai.models.gpt4,
-      prompt: `Customer question: ${event.body.question}`
-    });
-
-    return { answer: response.text };
-  }
-});
-```
-
-[Browse all examples →](./examples)
-
-## Basic Usage
-
-### Webhook Trigger
-
-```typescript
-import { Builtin } from "floww";
-
-const builtin = new Builtin();
-
-builtin.triggers.onWebhook({
-  path: '/custom',
-  handler: (ctx, event) => {
-    console.log('Received:', event.body);
-    return { success: true };
-  },
-});
-```
-
-Test it:
-```bash
-curl -X POST http://localhost:3000/webhooks/custom \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello"}'
-```
-
-### Cron Trigger
-
-```typescript
-builtin.triggers.onCron({
-  expression: "0 9 * * 1-5",  // Weekdays at 9 AM
-  handler: (ctx, event) => {
-    console.log('Daily task running');
-  }
-});
-```
-
-### Multiple Triggers
-
-Export an array of triggers from your workflow file:
-
-```typescript
-import { Builtin } from "floww";
-
-const builtin = new Builtin();
-
-export default [
-  builtin.triggers.onWebhook({
-    path: '/deploy',
-    handler: async (ctx, event) => {
-      // Handle deployments
-    },
-  }),
-
-  builtin.triggers.onCron({
-    expression: "0 */2 * * *",  // Every 2 hours
-    handler: async (ctx, event) => {
-      // Cleanup tasks
-    },
-  }),
-];
-```
-
-## AI & LLMs
-
-Floww has first-class AI support with the Vercel AI SDK integration.
-
-```typescript
-import { OpenAI, Builtin } from "floww";
-import { generateText } from "floww/ai";
-import { z } from "zod";
-
-const openai = new OpenAI();
-const builtin = new Builtin();
-
-builtin.triggers.onWebhook({
-  path: '/chat',
-  handler: async (ctx, event) => {
-    const result = await generateText({
-      model: openai.models.gpt4oMini,
-      prompt: event.body.message,
-      tools: {
-        getWeather: {
-          description: "Get current weather",
-          inputSchema: z.object({ city: z.string() }),
-          execute: async ({ city }) => {
-            // Your weather API call
-            return { temp: 72, condition: 'sunny' };
-          }
-        }
-      }
-    });
-
-    return { response: result.text };
-  }
-});
-```
-
-[See full AI example →](./examples/4_ai/main.ts)
-
-## Provider Configuration
-
-### Automatic Provider Detection
-
-Floww automatically detects which providers you're using in your code. When you run `npx floww dev` or `npx floww deploy`, you will be prompted to create those that don't exist yet
-
-
-### Using Multiple Provider Instances
-
-You can have multiple instances of the same provider in your namespace by using different aliases:
-
-```typescript
-import { Gitlab, OpenAI } from "floww";
-
-// Personal GitLab account
-const gitlabPersonal = new Gitlab("personal");
-
-// Work GitLab account
-const gitlabWork = new Gitlab("work");
-
-// Different OpenAI projects
-const openaiDev = new OpenAI("development");
-const openaiProd = new OpenAI("production");
-```
-
-Each alias is configured separately with its own credentials.
-
-
-### Available Providers
-- `builtin` - Webhooks and cron (no auth required)
-- `github` - GitHub events and API
-- `gitlab` - GitLab events and API
-- `slack` - Slack events and messaging
-- `discord` - Discord events and messaging
-- `jira` - Jira events and API
-- `todoist` - Todoist events and API
-- `openai` - AI models (GPT-4, GPT-4o, etc.)
-- `anthropic` - Claude models
-- `google` - Google AI models (Gemini)
-
-[See all providers →](https://usefloww.dev/docs/providers)
-
-## Providers
-
-### GitLab
-
-```typescript
-import { Gitlab } from "floww";
-
-const gitlab = new Gitlab();
-
-gitlab.triggers.onMergeRequest({
-  projectId: "my-project-id",
-  handler: (ctx, event) => {
-    console.log('MR:', event.object_attributes.title);
-  }
-});
-```
-
-### GitHub
-
-```typescript
-import { GitHub } from "floww";
-
-const github = new GitHub();
-
-github.triggers.onPullRequest({
-  owner: "my-org",
-  repository: "my-repo",
-  handler: (ctx, event) => {
-    console.log('PR:', event.pull_request.title);
-  }
-});
-```
-
-## CLI Commands
-
-### Development Mode
-
-```bash
-npx floww dev [file]        # Run with auto-reload (default: main.ts)
-npx floww dev --port 8080   # Custom port
-```
-
-**How it works:**
-
-When you run `npx floww dev`, the CLI:
-1. **Registers your triggers** on the Floww server (webhooks, cron schedules, etc.)
-2. **Routes events to your local machine** for execution
-3. **Watches for file changes** and hot-reloads your code
-
-This means:
-- Your webhooks get real URLs immediately (e.g., `https://app.usefloww.dev/webhook/abc123`)
-- Events are executed in your local environment with live code changes
-- You can test with real external services (GitLab webhooks, cron schedules, etc.)
-- All logging happens in your terminal in real-time
-
-**Example workflow:**
-```bash
-# Start dev server
-npx floww dev
-
-# Your webhook is registered and you get a URL:
-# ✓ Webhook registered: https://app.usefloww.dev/webhook/w_abc123/custom
-
-# Send a request to that URL from anywhere:
-curl -X POST https://app.usefloww.dev/webhook/w_abc123/custom \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello"}'
-
-# Event is routed to your local machine and executed
-# You see the logs in your terminal immediately
-```
-
-**Local-only testing:**
-
-For testing without deploying triggers, you can also use localhost:
-```bash
-curl -X POST http://localhost:3000/webhooks/custom \
-  -H "Content-Type: application/json" \
-  -d '{"test": true}'
-```
-
-## Deployment
-
-### First Time Setup
-
-1. Create a Floww account at [app.usefloww.dev](https://app.usefloww.dev)
-
-2. Login from CLI:
-```bash
-npx floww login
-```
-
-3. Deploy your workflow:
-```bash
-npx floww deploy
-```
-
-This will:
-- Bundle your TypeScript code
-- Upload to Floww cloud
-- Provision infrastructure
-- Return a webhook URL
+- [Quick Start Guide](https://floww.dev/docs/getting-started/quick-start)
+- [Running Locally](https://floww.dev/docs/running-locally)
+- [All Providers](https://floww.dev/docs/providers)
+- [Architecture](https://floww.dev/docs/advanced/architecture)
 
 ## Community
 
@@ -370,11 +129,71 @@ Join our Discord community to get help, share workflows, and connect with other 
 
 [Join Discord →](https://discord.gg/D9bughShqn)
 
-## Documentation
+## Project Structure
 
-For detailed documentation, visit [usefloww.dev](https://usefloww.dev)
+```
+floww-dashboard/
+├── .claude-plugin/         # Claude Code plugin metadata
+│   ├── plugin.json         # Plugin manifest
+│   └── marketplace.json    # Marketplace configuration
+├── skills/                 # Claude Code skill definitions
+│   └── floww/              # Floww SDK skill
+├── src/                    # Frontend React application
+│   ├── components/         # React components
+│   ├── routes/            # Tanstack Router routes
+│   └── lib/               # Frontend utilities
+├── server/                # Backend API and services
+│   ├── api/              # API routes (Hono)
+│   ├── db/               # Database schema and migrations
+│   ├── jobs/             # Background worker tasks
+│   └── services/         # Business logic
+├── packages/
+│   └── sdk/              # Floww SDK (published to npm as 'floww')
+│       ├── cli/          # CLI implementation
+│       ├── runtime/      # Runtime for executing workflows
+│       └── providers/    # Integration providers
+└── docker/               # Docker configuration
 
-- [Quick Start Guide](https://usefloww.dev/docs/getting-started/quick-start)
-- [Running Locally](https://usefloww.dev/docs/running-locally)
-- [All Providers](https://usefloww.dev/docs/providers)
-- [Architecture](https://usefloww.dev/docs/advanced/architecture)
+```
+
+## Tech Stack
+
+### Frontend
+- React 19 with TypeScript
+- Tanstack Router for routing
+- Tanstack Query for data fetching
+- Tailwind CSS for styling
+- Vite for build tooling
+
+### Backend
+- Hono for API server
+- PostgreSQL + Drizzle ORM
+- Graphile Worker for background jobs
+- Better Auth for authentication
+- Pino for logging
+
+### Infrastructure
+- AWS Lambda for workflow execution
+- Docker for containerization
+- Stripe for payments
+- Sentry for error tracking
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for:
+
+- Development setup guide
+- Coding standards and conventions
+- Testing requirements
+- Pull request process
+
+## License
+
+This project is licensed under the ISC License - see the LICENSE file for details.
+
+## Links
+
+- [Website](https://floww.dev)
+- [Documentation](https://floww.dev/docs)
+- [Discord Community](https://discord.gg/D9bughShqn)
+- [npm Package](https://www.npmjs.com/package/floww)

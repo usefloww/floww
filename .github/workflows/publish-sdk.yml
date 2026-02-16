@@ -1,0 +1,138 @@
+name: Publish SDK
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test-sdk:
+    name: Test SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run SDK typecheck
+        run: pnpm --filter floww typecheck
+
+      - name: Run SDK tests
+        run: pnpm --filter floww test:ci
+
+      - name: Build SDK
+        run: pnpm --filter floww build
+
+  publish-github:
+    name: Publish to GitHub Package Registry
+    needs: test-sdk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build SDK
+        run: pnpm --filter floww build
+
+      - name: Generate version from commit hash
+        working-directory: packages/sdk
+        run: |
+          COMMIT_HASH=${GITHUB_SHA:0:8}
+
+          # Get base version from package.json
+          BASE_VERSION=$(jq -r '.version' package.json)
+
+          # Create version with commit hash: x.y.z-sha.commithash
+          NEW_VERSION="${BASE_VERSION}-sha.${COMMIT_HASH}"
+
+          # Update package.json version and name for GitHub Package Registry
+          jq --arg version "$NEW_VERSION" --arg name "@usefloww/floww-sdk" '.version = $version | .name = $name' package.json > package.tmp.json
+          mv package.tmp.json package.json
+
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "Generated version: $NEW_VERSION"
+
+      - name: Set publishing config
+        run: pnpm config set '//npm.pkg.github.com/:_authToken' "${NODE_AUTH_TOKEN}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to GitHub Package Registry
+        working-directory: packages/sdk
+        run: pnpm publish --access public --no-git-checks
+
+  publish-npm:
+    name: Publish to npm
+    needs: test-sdk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build SDK
+        run: pnpm --filter floww build
+
+      - name: Check if version exists and publish
+        working-directory: packages/sdk
+        run: |
+          PACKAGE_VERSION=$(jq -r '.version' package.json)
+          echo "Package version: $PACKAGE_VERSION"
+
+          # Check if this version already exists on npm
+          if npm view floww@$PACKAGE_VERSION version 2>/dev/null; then
+            echo "Version $PACKAGE_VERSION already published to npm, skipping publish"
+            exit 0
+          fi
+
+          echo "Publishing version $PACKAGE_VERSION to npm"
+          pnpm publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

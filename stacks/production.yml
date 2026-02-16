@@ -1,0 +1,217 @@
+version: "3.8"
+
+services:
+  # Centrifugo WebSocket server
+  centrifugo:
+    image: "ghcr.io/usefloww/floww-dashboard-centrifugo:${IMAGE_TAG:-latest}"
+
+    networks:
+      - traefik-net
+
+    secrets:
+      - backend_centrifugo_api_key
+
+    environment:
+      - CENTRIFUGO_API_KEY_FILE=/run/secrets/backend_centrifugo_api_key
+      - CENTRIFUGO_ADMIN_ENABLED=true
+      - CENTRIFUGO_ADMIN_INSECURE=true
+      - CENTRIFUGO_CONNECT_PROXY_ENDPOINT=http://floww-dashboard_app:3000/centrifugo/connect
+      - CENTRIFUGO_SUBSCRIBE_PROXY_ENDPOINT=http://floww-dashboard_app:3000/centrifugo/subscribe
+      - CENTRIFUGO_ALLOWED_ORIGINS=["https://app.floww.dev"]
+      - CENTRIFUGO_ALLOW_ANONYMOUS=true
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.floww-dashboard-centrifugo.rule=Host(`app.floww.dev`) && PathPrefix(`/ws`)"
+        - "traefik.http.routers.floww-dashboard-centrifugo.entrypoints=websecure"
+        - "traefik.http.routers.floww-dashboard-centrifugo.tls.certresolver=myresolver"
+        - "traefik.http.services.floww-dashboard-centrifugo-service.loadbalancer.server.port=8000"
+
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+  # Main web application
+  app:
+    image: ${REGISTRY:-ghcr.io}/usefloww/floww-dashboard:${IMAGE_TAG:-latest}
+
+    networks:
+      - traefik-net
+
+    secrets:
+      - backend_auth_client_secret
+      - backend_database_password
+      - backend_encryption_key
+      - backend_session_secret_key
+      - backend_workflow_jwt_secret
+      - backend_centrifugo_api_key
+      - backend_centrifugo_jwt_secret
+      - backend_sentry_dsn
+      - backend_stripe_secret_key
+      - backend_stripe_webhook_secret
+      - backend_workos_api_key
+      - backend_aws_access_key_id
+      - backend_aws_secret_access_key
+      - backend_google_oauth_client_id
+      - backend_google_oauth_client_secret
+      - backend_openrouter_api_key
+
+    environment:
+      # Non-sensitive configuration
+      - NODE_ENV=production
+      - ENABLE_WORKER=true
+      - AUTH_TYPE=workos
+      - AUTH_CLIENT_ID=client_01K6QQP8Q721ZX1YM1PBV3EWMR
+      - AUTH_ISSUER_URL=https://great-gradient-36-staging.authkit.app
+      - WORKOS_CLIENT_ID=client_01K6QQP8Q721ZX1YM1PBV3EWMR
+      - DATABASE_USER=postgres
+      - DATABASE_HOST=floww.cklmackcedxs.us-east-1.rds.amazonaws.com
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=postgres
+      - CENTRIFUGO_HOST=floww-dashboard_centrifugo
+      - CENTRIFUGO_PORT=8000
+      - CENTRIFUGO_PUBLIC_URL=https://app.floww.dev
+      - BACKEND_URL=https://app.floww.dev
+      - PUBLIC_API_URL=https://app.floww.dev
+      - IS_CLOUD=true
+      - SENTRY_ENVIRONMENT=production
+      - STRIPE_PUBLISHABLE_KEY=pk_live_51SToIG9QR0ekoyxExl6rbZdjKrPubJFpPMe2dCiG7BxsVrJuQ04GP5QsMWQwg1L1s1tz255LV0JQMw2izZfHyeKZ00stQnGCze
+      - STRIPE_PRICE_ID_HOBBY=price_1SjjFK9QR0ekoyxEJlYJwPmb
+      - STRIPE_PRICE_ID_TEAM=price_1SjjFK9QR0ekoyxEJKp9zl6q
+      # Runtime configuration
+      - RUNTIME_TYPE=lambda
+      - AWS_REGION=us-east-1
+      - REGISTRY_URL=501046919403.dkr.ecr.us-east-1.amazonaws.com
+      - REGISTRY_REPOSITORY_NAME=trigger-lambda
+      - LAMBDA_EXECUTION_ROLE_ARN=arn:aws:iam::501046919403:role/LambdaRole
+
+      # Secret file paths (read by settings.ts via *_FILE env vars)
+      - AUTH_CLIENT_SECRET_FILE=/run/secrets/backend_auth_client_secret
+      - DATABASE_PASSWORD_FILE=/run/secrets/backend_database_password
+      - ENCRYPTION_KEY_FILE=/run/secrets/backend_encryption_key
+      - SESSION_SECRET_KEY_FILE=/run/secrets/backend_session_secret_key
+      - WORKFLOW_JWT_SECRET_FILE=/run/secrets/backend_workflow_jwt_secret
+      - CENTRIFUGO_API_KEY_FILE=/run/secrets/backend_centrifugo_api_key
+      - CENTRIFUGO_JWT_SECRET_FILE=/run/secrets/backend_centrifugo_jwt_secret
+      - SENTRY_DSN_FILE=/run/secrets/backend_sentry_dsn
+      - STRIPE_SECRET_KEY_FILE=/run/secrets/backend_stripe_secret_key
+      - STRIPE_WEBHOOK_SECRET_FILE=/run/secrets/backend_stripe_webhook_secret
+      - WORKOS_API_KEY_FILE=/run/secrets/backend_workos_api_key
+      - AWS_ACCESS_KEY_ID_FILE=/run/secrets/backend_aws_access_key_id
+      - AWS_SECRET_ACCESS_KEY_FILE=/run/secrets/backend_aws_secret_access_key
+      - GOOGLE_OAUTH_CLIENT_ID_FILE=/run/secrets/backend_google_oauth_client_id
+      - GOOGLE_OAUTH_CLIENT_SECRET_FILE=/run/secrets/backend_google_oauth_client_secret
+      - OPENROUTER_API_KEY_FILE=/run/secrets/backend_openrouter_api_key
+
+    deploy:
+      mode: replicated
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+      labels:
+        - "traefik.enable=true"
+        # Main app.floww.dev route
+        - "traefik.http.routers.floww-dashboard.rule=Host(`app.floww.dev`) && !PathPrefix(`/ws`)"
+        - "traefik.http.routers.floww-dashboard.entrypoints=websecure"
+        - "traefik.http.routers.floww-dashboard.tls.certresolver=myresolver"
+        - "traefik.http.services.floww-dashboard.loadbalancer.server.port=3000"
+        - "traefik.http.services.floww-dashboard.loadbalancer.healthcheck.path=/health"
+        - "traefik.http.services.floww-dashboard.loadbalancer.healthcheck.interval=30s"
+        # Redirect from app.usefloww.dev to app.floww.dev (excluding /webhook)
+        - "traefik.http.middlewares.usefloww-redirect.redirectregex.regex=^https://app\\.usefloww\\.dev/(.*)"
+        - "traefik.http.middlewares.usefloww-redirect.redirectregex.replacement=https://app.floww.dev/$${1}"
+        - "traefik.http.middlewares.usefloww-redirect.redirectregex.permanent=true"
+        - "traefik.http.routers.usefloww-redirect.rule=Host(`app.usefloww.dev`) && !PathPrefix(`/webhook`)"
+        - "traefik.http.routers.usefloww-redirect.entrypoints=websecure"
+        - "traefik.http.routers.usefloww-redirect.tls.certresolver=myresolver"
+        - "traefik.http.routers.usefloww-redirect.middlewares=usefloww-redirect"
+        # Direct route for app.usefloww.dev/webhook
+        - "traefik.http.routers.usefloww-webhook.rule=Host(`app.usefloww.dev`) && PathPrefix(`/webhook`)"
+        - "traefik.http.routers.usefloww-webhook.entrypoints=websecure"
+        - "traefik.http.routers.usefloww-webhook.tls.certresolver=myresolver"
+        - "traefik.http.routers.usefloww-webhook.service=floww-dashboard"
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+secrets:
+  backend_auth_client_secret:
+    external: true
+  backend_database_password:
+    external: true
+  backend_encryption_key:
+    external: true
+  backend_session_secret_key:
+    external: true
+  backend_workflow_jwt_secret:
+    external: true
+  backend_centrifugo_api_key:
+    external: true
+  backend_centrifugo_jwt_secret:
+    external: true
+  backend_sentry_dsn:
+    external: true
+  backend_stripe_secret_key:
+    external: true
+    name: backend_stripe_secret_key_v2
+  backend_stripe_webhook_secret:
+    external: true
+    name: backend_stripe_webhook_secret_v2
+  backend_workos_api_key:
+    external: true
+  backend_aws_access_key_id:
+    external: true
+  backend_aws_secret_access_key:
+    external: true
+  backend_google_oauth_client_id:
+    external: true
+  backend_google_oauth_client_secret:
+    external: true
+  backend_openrouter_api_key:
+    external: true
+
+networks:
+  traefik-net:
+    external: true

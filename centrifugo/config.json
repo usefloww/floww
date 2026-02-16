@@ -1,0 +1,57 @@
+{
+  "health": {
+    "enabled": true
+  },
+  "http_server": {
+    "port": "8000"
+  },
+  "http_api": {
+    "key": "${CENTRIFUGO_API_KEY}"
+  },
+  "websocket": {
+    "handler_prefix": "/ws/connection/websocket"
+  },
+  "admin": {
+    "enabled": ${CENTRIFUGO_ADMIN_ENABLED},
+    "insecure": ${CENTRIFUGO_ADMIN_INSECURE}
+  },
+  "client": {
+    "proxy": {
+      "connect": {
+        "enabled": true,
+        "endpoint": "${CENTRIFUGO_CONNECT_PROXY_ENDPOINT}",
+        "timeout": "5s",
+        "http_headers": ["Authorization"]
+      }
+    },
+    "allowed_origins": ${CENTRIFUGO_ALLOWED_ORIGINS},
+    "allow_anonymous_connect_without_token": ${CENTRIFUGO_ALLOW_ANONYMOUS}
+  },
+  "channel": {
+    "proxy": {
+      "subscribe": {
+        "endpoint": "${CENTRIFUGO_SUBSCRIBE_PROXY_ENDPOINT}",
+        "timeout": "5s",
+        "http_headers": ["Authorization"]
+      }
+    },
+    "namespaces": [
+      {
+        "name": "workflow",
+        "allow_subscribe_for_client": true,
+        "allow_subscribe_for_anonymous": false,
+        "allow_publish_for_subscriber": false,
+        "allow_publish_for_client": false,
+        "allow_publish_for_anonymous": false,
+        "presence": true,
+        "allow_presence_for_subscriber": true,
+        "allow_presence_for_client": true,
+        "history_size": 50,
+        "history_ttl": "600s",
+        "allow_history_for_subscriber": true,
+        "allow_history_for_client": true,
+        "join_leave": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "floww-floww-claude-plugin",
+  "owner": {
+    "name": "Floww"
+  },
+  "metadata": {
+    "description": "Official Floww plugin for Claude Code. Write, test, and deploy workflow automations."
+  },
+  "plugins": [
+    {
+      "name": "floww",
+      "source": "./",
+      "description": "Write, test, and deploy workflow automations using the Floww SDK",
+      "version": "1.0.0",
+      "category": "development-workflows",
+      "tags": ["automation", "workflows", "triggers", "deploy", "sdk"],
+      "homepage": "https://floww.dev"
+    }
+  ]
+}

@@ -1,0 +1,235 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: usefloww/floww-dashboard
+
+jobs:
+  test:
+    name: Test
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: floww_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run TypeScript check
+        run: pnpm typecheck
+
+      - name: Run tests
+        run: pnpm test:ci
+        env:
+          TEST_DATABASE_URL: postgresql://test:test@localhost:5432/floww_test
+          ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItdGVzdGluZw==
+          JWT_SECRET: test-jwt-secret
+          SESSION_SECRET: test-session-secret
+
+  build:
+    name: Build App Image
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Docker Builder
+        uses: useblacksmith/setup-docker-builder@v1
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: useblacksmith/build-push-action@v2
+        with:
+          context: .
+          target: runner
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VITE_SENTRY_DSN=${{ vars.SENTRY_DSN }}
+            VITE_SENTRY_ENVIRONMENT=production
+
+  build-centrifugo:
+    name: Build Centrifugo
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Docker Builder
+        uses: useblacksmith/setup-docker-builder@v1
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-centrifugo
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: useblacksmith/build-push-action@v2
+        with:
+          context: ./centrifugo
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: [build, build-centrifugo]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: staging
+      url: https://app.flow.toondn.app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup SSH Agent
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts
+          eval $(ssh-agent -s)
+          echo "${{ secrets.SERVER_PRIVATE_KEY }}" | ssh-add -
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> $GITHUB_ENV
+
+      - name: Deploy to Staging Swarm
+        env:
+          DOCKER_HOST: ssh://${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }}
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          set -o pipefail
+          output=$(docker stack deploy -c stacks/staging.yml floww-dashboard-staging --with-registry-auth --detach=false 2>&1 | tee /dev/stderr)
+          if echo "$output" | grep -q "rollback"; then
+            echo "::error::Deployment rolled back due to failure"
+            echo "--- Service status ---"
+            docker service ps floww-dashboard-staging_app --no-trunc
+            docker service ps floww-dashboard-staging_centrifugo --no-trunc
+            echo "--- Recent app logs ---"
+            docker service logs floww-dashboard-staging_app --tail 50 2>&1 || true
+            exit 1
+          fi
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://app.floww.dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup SSH Agent
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.SERVER_HOST }} >> ~/.ssh/known_hosts
+          eval $(ssh-agent -s)
+          echo "${{ secrets.SERVER_PRIVATE_KEY }}" | ssh-add -
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> $GITHUB_ENV
+
+      - name: Deploy to Production Swarm
+        env:
+          DOCKER_HOST: ssh://${{ vars.SERVER_USER }}@${{ vars.SERVER_HOST }}
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          set -o pipefail
+          output=$(docker stack deploy -c stacks/production.yml floww-dashboard --with-registry-auth --detach=false 2>&1 | tee /dev/stderr)
+          if echo "$output" | grep -q "rollback"; then
+            echo "::error::Deployment rolled back due to failure"
+            echo "--- Service status ---"
+            docker service ps floww-dashboard_app --no-trunc
+            docker service ps floww-dashboard_centrifugo --no-trunc
+            echo "--- Recent app logs ---"
+            docker service logs floww-dashboard_app --tail 50 2>&1 || true
+            exit 1
+          fi

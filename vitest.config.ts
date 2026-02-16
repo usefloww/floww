@@ -1,33 +1,28 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
   test: {
-    // Using projects to separate unit and integration tests
-    projects: [
-      {
-        // Unit tests project
-        test: {
-          name: "unit",
-          environment: "node",
-          globals: true,
-          testTimeout: 30000,
-          hookTimeout: 30000,
-          setupFiles: ["./tests/setup.ts"],
-          exclude: ["tests/integration/**/*.test.ts", "**/node_modules/**"],
-        },
-      },
-      {
-        // Integration tests project
-        test: {
-          name: "integration",
-          environment: "node",
-          globals: true,
-          testTimeout: 100000,
-          hookTimeout: 100000,
-          setupFiles: ["./tests/integration-setup.ts"],
-          include: ["tests/integration/**/*.test.ts"],
-        },
-      },
+    environment: 'node',
+    globals: true,
+    testTimeout: 30000, // 30 seconds for E2E tests
+    hookTimeout: 30000, // 30 seconds for setup/teardown
+    globalSetup: ['./tests/setup/run-migrations.ts'], // Runs ONCE before all tests
+    setupFiles: [
+      './tests/setup/global-setup.ts', // MUST be first - creates test DB connection
+      './tests/setup/db-mock.ts',       // MUST be second - mocks getDb() to use test DB
     ],
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true, // Run tests serially for transaction control
+      },
+    },
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      '~': path.resolve(__dirname, './'),
+    },
   },
 });
