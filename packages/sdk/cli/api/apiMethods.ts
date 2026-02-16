@@ -2,30 +2,24 @@ import { logger } from "../utils/logger";
 import { defaultApiClient } from "./client";
 import { ConflictError } from "./errors";
 
-// Type definitions for API responses
-export interface Namespace {
-  id: string;
-  user_owner_id?: string;
-  organization_owner_id?: string;
-  organization?: {
-    id: string;
-    name: string;
-    display_name: string;
-  };
-}
+// Shared types from the API contract (single source of truth)
+import type {
+  Namespace,
+  Workflow,
+  Provider,
+  ProviderType,
+  ProviderSetupStep,
+} from "@floww/api-contract";
 
-export interface Workflow {
-  id: string;
-  name: string;
-  description?: string;
-  namespace_id: string;
-  namespace_name?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+// Re-export shared types for consumers
+export type { Namespace, Workflow, Provider, ProviderType, ProviderSetupStep };
+
+// ============================================================================
+// SDK-specific types (not in the shared contract)
+// ============================================================================
 
 export interface RuntimeConfig {
-  image_hash: string;
+  imageHash: string;
 }
 
 export interface RuntimeCreateRequest {
@@ -35,15 +29,15 @@ export interface RuntimeCreateRequest {
 export interface RuntimeCreateResponse {
   id: string;
   config: any;
-  creation_status: string;
-  creation_logs: any[];
+  creationStatus: string;
+  creationLogs: any[];
 }
 
 export interface RuntimeStatusResponse {
   id: string;
   config: any;
-  creation_status: string;
-  creation_logs: any[];
+  creationStatus: string;
+  creationLogs: any[];
 }
 
 export interface WorkflowDeploymentUserCode {
@@ -64,47 +58,45 @@ export interface WebhookInfo {
   url: string;
   path?: string;
   method?: string;
-  trigger_id?: string;
-  trigger_type?: string;
-  provider_type?: string;
-  provider_alias?: string;
+  triggerId?: string;
+  triggerType?: string;
+  providerType?: string;
+  providerAlias?: string;
 }
 
 export interface WorkflowDeploymentCreateRequest {
-  workflow_id: string;
-  runtime_id: string;
+  workflowId: string;
+  runtimeId: string;
   code: WorkflowDeploymentUserCode;
   triggers?: TriggerMetadata[];
-  provider_mappings?: Record<string, Record<string, string>>;
+  providerMappings?: Record<string, Record<string, string>>;
 }
 
 export interface WorkflowDeploymentResponse {
   id: string;
-  workflow_id: string;
-  workflow_name?: string;
-  runtime_id: string;
-  runtime_name?: string;
-  deployed_by_id?: string;
+  workflowId: string;
+  workflowName?: string;
+  runtimeId: string;
+  runtimeName?: string;
+  deployedById?: string;
   status: string;
-  deployed_at: string;
+  deployedAt: string;
   note?: string;
-  user_code?: WorkflowDeploymentUserCode;
+  userCode?: WorkflowDeploymentUserCode;
   webhooks?: WebhookInfo[];
-}
-
-export interface PushTokenRequest {
-  image_name: string;
-  tag: string;
 }
 
 export interface PushTokenResponse {
   password: string;
-  expires_in: number;
-  image_tag: string;
-  registry_url: string;
+  expiresIn: number;
+  imageTag: string;
+  registryUrl: string;
 }
 
+// ============================================================================
 // Namespace API methods
+// ============================================================================
+
 export async function fetchNamespaces(): Promise<Namespace[]> {
   const data = await defaultApiClient().apiCall<{ results: Namespace[] }>(
     "/namespaces"
@@ -112,7 +104,10 @@ export async function fetchNamespaces(): Promise<Namespace[]> {
   return data.results;
 }
 
+// ============================================================================
 // Workflow API methods
+// ============================================================================
+
 export async function fetchWorkflows(): Promise<Workflow[]> {
   const data = await defaultApiClient().apiCall<{ results: Workflow[] }>(
     "/workflows"
@@ -133,22 +128,23 @@ export async function createWorkflow(
     method: "POST",
     body: {
       name,
-      namespace_id: namespaceId,
+      namespaceId,
       description,
     },
   });
 }
 
+// ============================================================================
 // Helper function to read project files
+// ============================================================================
+
 export async function readProjectFiles(
   projectDir: string,
   entrypoint: string
 ): Promise<WorkflowDeploymentUserCode> {
-  // Import fs and path dynamically to handle bundling issues
   const fs = await import("fs/promises");
   const path = await import("path");
 
-  // Read all files in the project directory recursively
   const files: Record<string, string> = {};
 
   async function readDirectory(dirPath: string, relativePath: string = "") {
@@ -160,7 +156,6 @@ export async function readProjectFiles(
         ? path.join(relativePath, entry.name)
         : entry.name;
 
-      // Skip node_modules, .git, and other common directories
       if (entry.isDirectory()) {
         if (
           !["node_modules", ".git", "dist", ".floww", "pulumi-state"].includes(
@@ -170,13 +165,12 @@ export async function readProjectFiles(
           await readDirectory(fullPath, relativeFilePath);
         }
       } else if (entry.isFile()) {
-        // Include source files (.ts, .js, .json, etc.)
         if (/\.(ts|js|json|yaml|yml)$/.test(entry.name)) {
           try {
             const content = await fs.readFile(fullPath, "utf-8");
             files[relativeFilePath] = content;
           } catch (error) {
-            console.warn(`⚠️ Could not read file: ${relativeFilePath}`);
+            console.warn(`Could not read file: ${relativeFilePath}`);
           }
         }
       }
@@ -191,6 +185,10 @@ export async function readProjectFiles(
   };
 }
 
+// ============================================================================
+// Runtime API methods
+// ============================================================================
+
 export class RuntimeAlreadyExistsError extends Error {
   runtimeId: string;
 
@@ -201,21 +199,19 @@ export class RuntimeAlreadyExistsError extends Error {
   }
 }
 
-// Runtime API methods
 export async function getPushData(
-  image_hash: string
+  imageHash: string
 ): Promise<PushTokenResponse | null> {
   try {
     return await defaultApiClient().apiCall<PushTokenResponse>(
       "/runtimes/push_token",
       {
         method: "POST",
-        body: { image_hash },
+        body: { image_hash: imageHash },
       }
     );
   } catch (error) {
     if (error instanceof ConflictError) {
-      // Image already exists in registry, return null to indicate no push needed
       return null;
     }
     throw error;
@@ -250,19 +246,22 @@ export async function getRuntimeStatus(
   );
 }
 
+// ============================================================================
+// Deployment API methods
+// ============================================================================
+
 export async function createWorkflowDeployment(
   deploymentData: WorkflowDeploymentCreateRequest
 ): Promise<WorkflowDeploymentResponse> {
   try {
     return await defaultApiClient().apiCall<WorkflowDeploymentResponse>(
-      "/workflow_deployments",
+      "/workflow-deployments",
       {
         method: "POST",
         body: deploymentData,
       }
     );
   } catch (error: any) {
-    // Check if this is a trigger failure error
     if (error.details?.detail?.failed_triggers) {
       const triggerError = new Error(
         error.details.detail.message || "Failed to create triggers"
@@ -278,43 +277,19 @@ export async function createWorkflowDeployment(
 export async function listWorkflowDeployments(
   workflowId?: string
 ): Promise<WorkflowDeploymentResponse[]> {
-  const queryParams = workflowId ? `?workflow_id=${workflowId}` : "";
+  const queryParams = workflowId ? `?workflowId=${workflowId}` : "";
   const data = await defaultApiClient().apiCall<{
     results: WorkflowDeploymentResponse[];
   }>(`/workflow-deployments${queryParams}`);
   return data.results;
 }
 
-// Provider API types and methods
-export interface ProviderSetupStep {
-  type: string;
-  title: string;
-  alias: string;
-  required: boolean;
-  description?: string;
-  placeholder?: string;
-  default?: string;
-  // Info step fields
-  message?: string;
-  action_text?: string;
-  action_url?: string;
-}
-
-export interface ProviderType {
-  provider_type: string;
-  setup_steps: ProviderSetupStep[];
-}
-
-export interface Provider {
-  id: string;
-  namespace_id: string;
-  type: string;
-  alias: string;
-  config: Record<string, any>;
-}
+// ============================================================================
+// Provider API methods
+// ============================================================================
 
 export interface ProviderCreateRequest {
-  namespace_id: string;
+  namespaceId: string;
   type: string;
   alias: string;
   config: Record<string, any>;
@@ -326,7 +301,6 @@ export interface ProviderUpdateRequest {
   config?: Record<string, any>;
 }
 
-// Provider API methods
 export async function fetchProviders(): Promise<Provider[]> {
   const data = await defaultApiClient().apiCall<{ results: Provider[] }>(
     "/providers"
@@ -378,11 +352,14 @@ export async function deleteProvider(providerId: string): Promise<void> {
   });
 }
 
+// ============================================================================
 // Dev Mode API methods
+// ============================================================================
+
 export interface DevTriggerSyncRequest {
-  workflow_id: string;
-  triggers: any[]; // TriggerMetadata[]
-  provider_mappings?: Record<string, Record<string, string>>;
+  workflowId: string;
+  triggers: any[];
+  providerMappings?: Record<string, Record<string, string>>;
 }
 
 export interface DevTriggerSyncResponse {
@@ -401,7 +378,6 @@ export async function syncDevTriggers(
       }
     );
   } catch (error: any) {
-    // Check if this is a trigger failure error
     if (error.details?.detail?.failed_triggers) {
       const triggerError = new Error(
         error.details.detail.message || "Failed to create triggers"

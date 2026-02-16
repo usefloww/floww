@@ -52,7 +52,7 @@ export async function checkProviderAvailability(
         const { defaultApiClient } = await import("../api/client");
         const existingProvider = existingMap.get(key)!;
 
-        const manager = new SecretManager(defaultApiClient(), existingProvider.namespace_id);
+        const manager = new SecretManager(defaultApiClient(), existingProvider.namespaceId);
         const secrets = await manager.getProviderSecrets(used.type, used.alias || "default");
 
         // Check if secrets exist and have the required keys
@@ -112,7 +112,7 @@ async function checkProviderAvailabilityByMapping(
           const { SecretManager } = await import("../secrets/secretManager");
           const { defaultApiClient } = await import("../api/client");
 
-          const manager = new SecretManager(defaultApiClient(), provider.namespace_id);
+          const manager = new SecretManager(defaultApiClient(), provider.namespaceId);
           const secrets = await manager.getProviderSecrets(provider.type, provider.alias);
 
           if (secrets && used.secretDefinitions.every(def => secrets[def.key] !== undefined)) {

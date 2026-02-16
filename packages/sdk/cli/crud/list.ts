@@ -71,9 +71,9 @@ export async function listWorkflowsCommand() {
     workflows.forEach((workflow: Workflow) => {
       table.push([
         chalk.white(workflow.name),
-        chalk.cyan(workflow.namespace_name || workflow.namespace_id),
+        chalk.cyan(workflow.namespaceId),
         chalk.dim(workflow.id),
-        chalk.green(formatDate(workflow.created_at)),
+        chalk.green(formatDate(workflow.createdAt)),
         chalk.dim(truncateText(workflow.description || "", 50)),
       ]);
     });
@@ -130,18 +130,15 @@ export async function listNamespacesCommand() {
     });
 
     namespaces.forEach((namespace: Namespace) => {
-      let owner = chalk.dim("unknown");
-      if (namespace.user_owner_id) {
-        owner = chalk.blue(`user:${namespace.user_owner_id.substring(0, 8)}`);
-      } else if (namespace.organization_owner_id) {
-        owner = chalk.magenta(
-          `org:${namespace.organization_owner_id.substring(0, 8)}`,
-        );
-      }
+      const owner = namespace.organization
+        ? chalk.magenta(`org:${namespace.organization.id.substring(0, 8)}`)
+        : namespace.user
+          ? chalk.blue(`user:${namespace.user.id.substring(0, 8)}`)
+          : chalk.dim("unknown");
 
       table.push([
-        chalk.white(namespace.organization?.name || 'personal'),
-        chalk.cyan(namespace.organization?.display_name || 'Personal'),
+        chalk.white(namespace.organization?.displayName || 'Personal'),
+        chalk.cyan(namespace.organization?.displayName || 'Personal'),
         chalk.dim(namespace.id.substring(0, 8)),
         owner,
       ]);
@@ -216,13 +213,13 @@ export async function listDeploymentsCommand(workflowId?: string) {
     deployments.forEach((deployment: WorkflowDeploymentResponse) => {
       table.push([
         chalk.white(
-          deployment.workflow_name || truncateText(deployment.workflow_id, 12),
+          deployment.workflowName || truncateText(deployment.workflowId, 12),
         ),
         chalk.cyan(
-          deployment.runtime_name || truncateText(deployment.runtime_id, 12),
+          deployment.runtimeName || truncateText(deployment.runtimeId, 12),
         ),
         formatStatus(deployment.status),
-        chalk.green(formatDate(deployment.deployed_at)),
+        chalk.green(formatDate(deployment.deployedAt)),
         chalk.dim(deployment.id.substring(0, 8)),
       ]);
     });
@@ -291,7 +288,7 @@ export async function listProvidersCommand() {
       table.push([
         chalk.white(provider.alias),
         chalk.cyan(provider.type),
-        chalk.dim(provider.namespace_id.substring(0, 8)),
+        chalk.dim(provider.namespaceId.substring(0, 8)),
         chalk.dim(provider.id.substring(0, 8)),
       ]);
     });

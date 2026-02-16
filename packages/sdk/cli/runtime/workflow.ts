@@ -34,11 +34,11 @@ export async function resolveWorkflow(
     const workflow = await fetchWorkflow(projectConfig.workflowId);
 
     logger.debugInfo(`Resolved workflow: ${workflow.name}`);
-    logger.debugInfo(`Namespace ID: ${workflow.namespace_id}`);
+    logger.debugInfo(`Namespace ID: ${workflow.namespaceId}`);
 
     return {
       workflowId: workflow.id,
-      namespaceId: workflow.namespace_id,
+      namespaceId: workflow.namespaceId,
       name: workflow.name || workflow.id,
     };
   } catch (error) {

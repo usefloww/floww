@@ -55,7 +55,7 @@ async function whoamiCommand() {
   console.log(chalk.gray("─".repeat(50)));
 
   // Don't show email for service accounts
-  if (user.user_type !== "service_account") {
+  if (user.userType !== "SERVICE_ACCOUNT") {
     console.log(
       `  ${formatLabel("Email:")}${
         user.email ? chalk.white.bold(user.email) : chalk.dim("N/A")
@@ -63,8 +63,8 @@ async function whoamiCommand() {
     );
   }
 
-  if (user.first_name || user.last_name) {
-    const fullName = [user.first_name, user.last_name]
+  if (user.firstName || user.lastName) {
+    const fullName = [user.firstName, user.lastName]
       .filter(Boolean)
       .join(" ");
     console.log(`  ${formatLabel("Name:")}${chalk.white(fullName)}`);
@@ -72,14 +72,14 @@ async function whoamiCommand() {
 
   console.log(`  ${formatLabel("User ID:")}${chalk.dim(user.id)}`);
 
-  if (user.user_type) {
+  if (user.userType) {
     const userTypeColor =
-      user.user_type === "human" ? chalk.green : chalk.blue;
-    console.log(`  ${formatLabel("Type:")}${userTypeColor(user.user_type)}`);
+      user.userType === "HUMAN" ? chalk.green : chalk.blue;
+    console.log(`  ${formatLabel("Type:")}${userTypeColor(user.userType)}`);
   }
 
-  if (user.created_at) {
-    const createdAt = new Date(user.created_at).toLocaleDateString("en-US", {
+  if (user.createdAt) {
+    const createdAt = new Date(user.createdAt).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",

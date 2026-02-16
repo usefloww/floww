@@ -10,6 +10,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "~/*": ["./*"],
+      "@floww/api-contract": ["./packages/api-contract/index.ts"],
       "floww": ["./packages/sdk/index.ts"],
       "floww/*": ["./packages/sdk/*"]
     },

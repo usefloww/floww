@@ -30,7 +30,7 @@ const createWorkflowDeploymentSchema = z.object({
   workflowId: z.string().min(1, 'workflowId is required'),
   runtimeId: z.string().optional(),
   code: z.object({
-    files: z.record(z.string()),
+    files: z.record(z.string(), z.string()),
     entrypoint: z.string(),
   }),
   triggers: z
@@ -44,16 +44,16 @@ const createWorkflowDeploymentSchema = z.object({
         providerType: z.string().optional(),
         providerAlias: z.string().optional(),
         triggerType: z.string().optional(),
-        input: z.record(z.unknown()).optional(),
+        input: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .optional(),
-  providerMappings: z.record(z.record(z.string())).optional(),
+  providerMappings: z.record(z.string(), z.record(z.string(), z.string())).optional(),
 });
 
 const updateWorkflowDeploymentSchema = z.object({
   status: z.enum(['ACTIVE', 'INACTIVE', 'FAILED']).optional(),
-  userCode: z.record(z.unknown()).optional(),
+  userCode: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**

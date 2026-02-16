@@ -378,7 +378,7 @@ export function WorkflowBuilder({ workflowId }: WorkflowBuilderProps) {
     queryFn: async () => {
       const params = { workflowId: workflowId };
       const data = await api.get<WorkflowDeploymentsResponse>("/workflow-deployments", { params });
-      return (data.deployments || []).sort(
+      return (data.results || []).sort(
         (a, b) => new Date(b.deployedAt).getTime() - new Date(a.deployedAt).getTime()
       );
     },

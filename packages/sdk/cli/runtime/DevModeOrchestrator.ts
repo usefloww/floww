@@ -189,7 +189,7 @@ export class DevModeOrchestrator {
         logger.plain("");
         logger.warn("Failed Triggers:");
         for (const trigger of error.failedTriggers) {
-          const triggerName = `${trigger.provider_type}/${trigger.trigger_type}`;
+          const triggerName = `${trigger.providerType}/${trigger.triggerType}`;
           const errorMsg = trigger.error || "Unknown error";
           // Clean up error message - remove the "For more information" link if present
           const cleanError = errorMsg.split("\nFor more information")[0].trim();
@@ -239,9 +239,9 @@ export class DevModeOrchestrator {
 
       // Add provider metadata if available
       if (trigger._providerMeta) {
-        metadata.provider_type = trigger._providerMeta.type;
-        metadata.provider_alias = trigger._providerMeta.alias;
-        metadata.trigger_type = trigger._providerMeta.triggerType;
+        metadata.providerType = trigger._providerMeta.type;
+        metadata.providerAlias = trigger._providerMeta.alias;
+        metadata.triggerType = trigger._providerMeta.triggerType;
         metadata.input = trigger._providerMeta.input;
       }
 
@@ -261,9 +261,9 @@ export class DevModeOrchestrator {
 
     // Sync with backend (include provider mappings if available)
     const response = await syncDevTriggers({
-      workflow_id: this.workflow.workflowId,
+      workflowId: this.workflow.workflowId,
       triggers: triggersMetadata,
-      provider_mappings: currentMappings && Object.keys(currentMappings).length > 0
+      providerMappings: currentMappings && Object.keys(currentMappings).length > 0
         ? currentMappings
         : undefined,
     });
@@ -277,14 +277,14 @@ export class DevModeOrchestrator {
         const methodLabel = (webhook.method || "POST").toUpperCase().padEnd(6);
         let triggerLabel = "webhook trigger";
 
-        if (webhook.provider_type) {
-          const aliasPart = webhook.provider_alias
-            ? `:${webhook.provider_alias}`
+        if (webhook.providerType) {
+          const aliasPart = webhook.providerAlias
+            ? `:${webhook.providerAlias}`
             : "";
-          const triggerType = webhook.trigger_type || "webhook";
-          triggerLabel = `${webhook.provider_type}${aliasPart}.${triggerType}`;
-        } else if (webhook.trigger_type) {
-          triggerLabel = webhook.trigger_type;
+          const triggerType = webhook.triggerType || "webhook";
+          triggerLabel = `${webhook.providerType}${aliasPart}.${triggerType}`;
+        } else if (webhook.triggerType) {
+          triggerLabel = webhook.triggerType;
         }
 
         console.log(`   ${methodLabel} ${webhook.url} — ${triggerLabel}`);
@@ -325,7 +325,7 @@ export class DevModeOrchestrator {
         logger.plain("");
         logger.warn("Failed Triggers:");
         for (const trigger of error.failedTriggers) {
-          const triggerName = `${trigger.provider_type}/${trigger.trigger_type}`;
+          const triggerName = `${trigger.providerType}/${trigger.triggerType}`;
           const errorMsg = trigger.error || "Unknown error";
           // Clean up error message - remove the "For more information" link if present
           const cleanError = errorMsg.split("\nFor more information")[0].trim();

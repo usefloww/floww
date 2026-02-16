@@ -109,13 +109,15 @@ export function ProviderConfigModal({
               // Mask existing secrets
               initialConfig[step.alias] = "••••••••";
             } else if (step.type !== "info" && step.type !== "oauth") {
-              initialConfig[step.alias] = provider.config[step.alias] || "";
+              const value = provider.config[step.alias];
+              initialConfig[step.alias] = (typeof value === 'string' ? value : String(value || "")) || "";
             }
           });
         } else {
           // Fallback: set all config values (will be masked once type loads)
           Object.keys(provider.config).forEach((key) => {
-            initialConfig[key] = provider.config[key] || "";
+            const value = provider.config[key];
+            initialConfig[key] = (typeof value === 'string' ? value : String(value || "")) || "";
           });
         }
         setConfig(initialConfig);
@@ -140,7 +142,8 @@ export function ProviderConfigModal({
         if (step.type === "secret" && provider.config[step.alias]) {
           updatedConfig[step.alias] = "••••••••";
         } else if (step.type !== "info" && step.type !== "oauth") {
-          updatedConfig[step.alias] = provider.config[step.alias] || "";
+          const value = provider.config[step.alias];
+          updatedConfig[step.alias] = (typeof value === 'string' ? value : String(value || "")) || "";
         }
       });
       setConfig(updatedConfig);
@@ -340,7 +343,8 @@ export function ProviderConfigModal({
 
     if (step.type === "webhook") {
       // Use existing webhook URL from provider config, or the pre-generated default
-      const webhookUrl = provider?.config[step.alias] || step.default || "";
+      const configValue = provider?.config[step.alias];
+      const webhookUrl = (typeof configValue === 'string' ? configValue : String(configValue || "")) || step.default || "";
       return (
         <div key={step.alias}>
           <Label htmlFor={step.alias}>{step.title}</Label>
@@ -496,8 +500,8 @@ export function ProviderConfigModal({
     const value = config[step.alias] || "";
     const isSecret = step.type === "secret";
     // Check if this is a masked secret (has existing value but user hasn't changed it)
-    const hasExistingSecret = isEditMode && isSecret && provider && provider.config[step.alias];
-    const isMasked = hasExistingSecret && (value === "••••••••" || value === "");
+    const hasExistingSecret = isEditMode && isSecret && provider && !!provider.config[step.alias];
+    const isMasked: boolean = hasExistingSecret && (value === "••••••••" || value === "");
     const hasError = !!errors[step.alias];
 
     return (

@@ -85,9 +85,9 @@ async function pollRuntimeUntilReady(runtimeId: string): Promise<void> {
       const status = await getRuntimeStatus(runtimeId);
 
       // Check final status
-      if (status.creation_status === "completed") {
+      if (status.creationStatus === "completed") {
         return;
-      } else if (status.creation_status === "failed") {
+      } else if (status.creationStatus === "failed") {
         throw new Error("Runtime creation failed");
       }
 
@@ -107,11 +107,7 @@ async function selectWorkflow(projectConfig?: ProjectConfig): Promise<string> {
     const options = workflows.map((workflow) => ({
       value: workflow.id,
       label: workflow.name,
-      hint: workflow.namespace_name
-        ? `${workflow.namespace_name}${
-            workflow.description ? ` - ${workflow.description}` : ""
-          }`
-        : workflow.description,
+      hint: workflow.description,
     }));
 
     // Add "Create new workflow" option
@@ -167,9 +163,9 @@ function convertTriggersToMetadata(triggers: any[]): any[] {
 
     // Add provider metadata if available (for provider-managed triggers)
     if (trigger._providerMeta) {
-      metadata.provider_type = trigger._providerMeta.type;
-      metadata.provider_alias = trigger._providerMeta.alias;
-      metadata.trigger_type = trigger._providerMeta.triggerType;
+      metadata.providerType = trigger._providerMeta.type;
+      metadata.providerAlias = trigger._providerMeta.alias;
+      metadata.triggerType = trigger._providerMeta.triggerType;
       metadata.input = trigger._providerMeta.input;
     }
 
@@ -420,13 +416,13 @@ export async function deployCommand() {
     await logger.task(
       "☁️  Uploading runtime image (this may take a moment)",
       async () => {
-        const imageUri = `${pushData.registry_url}:${imageHash}`;
+        const imageUri = `${pushData.registryUrl}:${imageHash}`;
         await dockerRetagImage({
           currentTag: buildResult.localImage,
           newTag: imageUri,
         });
         await dockerLogin({
-          registryUrl: pushData.registry_url,
+          registryUrl: pushData.registryUrl,
           token: pushData.password,
         });
         await dockerPushImage({ imageUri: imageUri });
@@ -445,7 +441,7 @@ export async function deployCommand() {
       try {
         const runtime = await createRuntime({
           config: {
-            image_hash: imageHash,
+            imageHash: imageHash,
           },
         });
         await pollRuntimeUntilReady(runtime.id);
@@ -477,11 +473,11 @@ export async function deployCommand() {
   try {
     const deployment = await logger.task("🚀 Deploying workflow", async () => {
       return await createWorkflowDeployment({
-        workflow_id: projectConfig.workflowId!,
-        runtime_id: runtimeResult.id,
+        workflowId: projectConfig.workflowId!,
+        runtimeId: runtimeResult.id,
         code: userCode,
         triggers: triggersMetadata,
-        provider_mappings: providerMappings && Object.keys(providerMappings).length > 0
+        providerMappings: providerMappings && Object.keys(providerMappings).length > 0
           ? providerMappings
           : undefined,
       });
@@ -506,7 +502,7 @@ export async function deployCommand() {
       console.log("\n❌ Deployment failed: Trigger creation errors");
       console.log("\n⚠️  Failed Triggers:");
       for (const trigger of error.failedTriggers) {
-        const triggerName = `${trigger.provider_type}/${trigger.trigger_type}`;
+        const triggerName = `${trigger.providerType}/${trigger.triggerType}`;
         const errorMsg = trigger.error || "Unknown error";
         // Clean up error message - remove the "For more information" link if present
         const cleanError = errorMsg.split("\nFor more information")[0].trim();

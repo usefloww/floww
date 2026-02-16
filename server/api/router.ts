@@ -5,7 +5,7 @@
  * Separated from index.ts to avoid circular dependencies with route files.
  */
 
-import { type ZodSchema, type ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import { authenticateRequest, type AuthenticatedUser } from '~/server/services/auth';
 import { logger, updateRequestContext } from '~/server/utils/logger';
 import { captureException } from '~/server/utils/sentry';
@@ -98,7 +98,7 @@ export function errorResponse(message: string, status: number = 400): Response {
  * Format Zod validation errors into a readable message
  */
 function formatZodError(error: ZodError): string {
-  const messages = error.errors.map((e) => {
+  const messages = error.issues.map((e) => {
     const path = e.path.join('.');
     return path ? `${path}: ${e.message}` : e.message;
   });
@@ -110,7 +110,7 @@ function formatZodError(error: ZodError): string {
  */
 export async function parseBody<T>(
   request: Request,
-  schema: ZodSchema<T>
+  schema: z.ZodType<T>
 ): Promise<{ data: T } | { error: Response }> {
   let body: unknown;
   try {

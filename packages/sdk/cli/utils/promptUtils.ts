@@ -52,14 +52,13 @@ export async function setupWorkflow(
 
     if (namespaces.length === 1) {
       selectedNamespaceId = namespaces[0].id;
-      logger.success(`Using namespace: ${namespaces[0].organization?.display_name || 'Personal'}`);
+      logger.success(`Using namespace: ${namespaces[0].organization?.displayName || 'Personal'}`);
     } else {
       selectedNamespaceId = await logger.select(
         "Select a namespace:",
         namespaces.map((ns) => ({
           value: ns.id,
-          label: ns.organization?.display_name || 'Personal',
-          hint: ns.organization?.name || 'personal',
+          label: ns.organization?.displayName || 'Personal',
         })),
       );
     }

@@ -31,7 +31,7 @@ export async function setupUnavailableProviders(
   for (const provider of unavailableProviders) {
     try {
       const providerType = await fetchProviderType(provider.type);
-      if (providerType.setup_steps.length === 0) {
+      if (providerType.setupSteps.length === 0) {
         providersToAutoCreate.push(provider);
       } else {
         providersNeedingSetup.push(provider);
@@ -48,7 +48,7 @@ export async function setupUnavailableProviders(
       `Auto-creating ${provider.type} provider (${provider.alias})`,
       async () => {
         await createProvider({
-          namespace_id: namespaceId,
+          namespaceId: namespaceId,
           type: provider.type,
           alias: provider.alias || provider.type,
           config: {},
@@ -135,7 +135,7 @@ async function setupSingleProvider(
     const config: Record<string, any> = {};
     const webhookSteps: ProviderSetupStep[] = [];
 
-    for (const step of providerType.setup_steps) {
+    for (const step of providerType.setupSteps) {
       if (step.type === "info") {
         // Display info step without collecting a value
         await displayInfoStep(step);
@@ -171,7 +171,7 @@ async function setupSingleProvider(
     // Create the provider
     const createdProvider = await logger.task("Creating provider", async () => {
       return await createProvider({
-        namespace_id: namespaceId,
+        namespaceId: namespaceId,
         type: provider.type,
         alias: provider.alias || provider.type,
         config,
@@ -250,7 +250,7 @@ async function setupSecretProvider(
   // Create provider entry (with empty config since secrets are stored separately)
   await logger.task("Creating provider", async () => {
     await createProvider({
-      namespace_id: namespaceId,
+      namespaceId: namespaceId,
       type: provider.type,
       alias: alias,
       config: {},
@@ -270,9 +270,9 @@ async function displayInfoStep(step: ProviderSetupStep): Promise<void> {
   }
 
   // Display action link if provided
-  if (step.action_url) {
-    const actionText = step.action_text || "Open link";
-    logger.plain(`\n🔗 ${actionText}: ${step.action_url}`);
+  if (step.actionUrl) {
+    const actionText = step.actionText || "Open link";
+    logger.plain(`\n🔗 ${actionText}: ${step.actionUrl}`);
   }
 
   // Prompt user to continue
