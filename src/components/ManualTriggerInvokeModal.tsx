@@ -11,7 +11,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
-import { ManualTriggerInfo, invokeManualTrigger } from "@/lib/api";
+import { ManualTriggerInfo, invokeManualTrigger } from "@/lib/server/triggers";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -106,7 +106,7 @@ export function ManualTriggerInvokeModal({
         }
       });
 
-      const result = await invokeManualTrigger(trigger.id, processedData);
+      const result = await invokeManualTrigger({ data: { triggerId: trigger.id, inputData: processedData } });
 
       onOpenChange(false);
       setFormData({});

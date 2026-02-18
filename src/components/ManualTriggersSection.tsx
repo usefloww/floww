@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getManualTriggers, ManualTriggerInfo } from "@/lib/api";
+import { getManualTriggers, ManualTriggerInfo } from "@/lib/server/triggers";
 import { Loader } from "./Loader";
 import { ManualTriggerCard } from "./ManualTriggerCard";
 import { ManualTriggerInvokeModal } from "./ManualTriggerInvokeModal";
@@ -22,7 +22,7 @@ export function ManualTriggersSection({ workflowId }: ManualTriggersSectionProps
   } = useQuery({
     queryKey: ["manual-triggers", workflowId],
     queryFn: async () => {
-      return await getManualTriggers(workflowId);
+      return await getManualTriggers({ data: { workflowId } });
     },
   });
 

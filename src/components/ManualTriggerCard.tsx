@@ -1,7 +1,7 @@
 import { PlayIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
-import { ManualTriggerInfo } from "@/lib/api";
+import { ManualTriggerInfo } from "@/lib/server/triggers";
 
 interface ManualTriggerCardProps {
   trigger: ManualTriggerInfo;
