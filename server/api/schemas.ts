@@ -19,7 +19,6 @@ export {
   updateWorkflowSchema,
   createFolderSchema,
   importN8nWorkflowSchema,
-  workflowBuilderChatSchema,
 } from '@floww/api-contract';
 
 // Deployment schemas

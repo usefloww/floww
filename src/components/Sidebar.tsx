@@ -37,6 +37,7 @@ import {
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
+  Shield,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
@@ -368,6 +369,33 @@ export function Sidebar() {
           })}
         </div>
       </nav>
+
+      {/* Admin Link */}
+      {user?.isAdmin && (
+        <div className={cn("border-t border-border", isCollapsed ? "p-2" : "px-4 py-2")}>
+          {isCollapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  to="/admin"
+                  className="flex items-center justify-center p-2 text-sm font-medium rounded-md text-muted-foreground hover:bg-muted hover:text-foreground [&.active]:bg-primary/10 [&.active]:text-primary"
+                >
+                  <Shield className="h-5 w-5" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">Admin</TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link
+              to="/admin"
+              className="flex items-center space-x-3 px-3 py-2 text-sm font-medium rounded-md text-muted-foreground hover:bg-muted hover:text-foreground [&.active]:bg-primary/10 [&.active]:text-primary"
+            >
+              <Shield className="h-5 w-5" />
+              <span>Admin</span>
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* Collapse Toggle */}
       <div className={cn("border-t border-border", isCollapsed ? "p-2" : "p-4")}>

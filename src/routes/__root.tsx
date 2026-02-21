@@ -72,10 +72,12 @@ function RootComponent() {
 }
 
 const AUTH_PAGE_PATHS = ['/login', '/setup']
+const CUSTOM_LAYOUT_PATHS = ['/admin']
 
 function RootDocument() {
   const location = useLocation()
   const isAuthPage = AUTH_PAGE_PATHS.some((path) => location.pathname === path)
+  const hasCustomLayout = CUSTOM_LAYOUT_PATHS.some((path) => location.pathname.startsWith(path))
 
   return (
     <html suppressHydrationWarning>
@@ -94,6 +96,12 @@ function RootDocument() {
                     <NotificationContainer />
                     <TanStackRouterDevtools />
                   </div>
+                ) : hasCustomLayout ? (
+                  <>
+                    <Outlet />
+                    <NotificationContainer />
+                    <TanStackRouterDevtools />
+                  </>
                 ) : (
                   <>
                     <div className="flex h-full">

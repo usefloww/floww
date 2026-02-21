@@ -24,84 +24,6 @@ import { handleApiRequest } from "~/server/api";
 import { startWorker, stopWorker, isWorkerRunning, initWorkerUtils } from "~/server/jobs/worker";
 import { logger, runWithRequestContext, logAccess } from "~/server/utils/logger";
 import { initSentry, captureException, flush as flushSentry } from "~/server/utils/sentry";
-import type { Hono } from 'hono';
-
-let cachedAdminRouter: Hono | null = null;
-
-async function getAdminRouter(): Promise<Hono> {
-  if (!cachedAdminRouter) {
-    const { createAdminRouter } = await import("~/server/admin");
-    cachedAdminRouter = await createAdminRouter({
-      rootPath: "/admin",
-    });
-    logger.info('Admin panel initialized');
-  }
-  return cachedAdminRouter;
-}
-
-const ADMIN_ASSET_EXTENSIONS = /\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot|ico|map)$/;
-
-function isAdminAsset(pathname: string): boolean {
-  return ADMIN_ASSET_EXTENSIONS.test(pathname);
-}
-
-function renderAdminForbiddenPage(): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>403 - Access Denied</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: #f5f5f5;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      color: #333;
-    }
-    .container {
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-      padding: 48px;
-      max-width: 440px;
-      text-align: center;
-    }
-    .status { font-size: 64px; font-weight: 700; color: #e74c3c; margin-bottom: 8px; }
-    h1 { font-size: 22px; font-weight: 600; margin-bottom: 12px; }
-    p { font-size: 15px; color: #666; line-height: 1.5; margin-bottom: 28px; }
-    .actions { display: flex; gap: 12px; justify-content: center; }
-    a {
-      display: inline-block;
-      padding: 10px 24px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      text-decoration: none;
-      transition: opacity 0.15s;
-    }
-    a:hover { opacity: 0.85; }
-    .btn-primary { background: #3040d6; color: #fff; }
-    .btn-secondary { background: #eee; color: #333; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="status">403</div>
-    <h1>Access Denied</h1>
-    <p>Your account does not have administrator privileges. Contact an existing admin if you believe this is a mistake.</p>
-    <div class="actions">
-      <a href="/" class="btn-secondary">Back to App</a>
-      <a href="/auth/logout" class="btn-primary">Sign in with another account</a>
-    </div>
-  </div>
-</body>
-</html>`;
-}
 
 // Auth handlers (lazy loaded to avoid SSR issues)
 async function handleAuthLogin(request: Request): Promise<Response> {
@@ -320,37 +242,6 @@ const serverEntry: ServerEntry = {
           const apiResponse = await handleApiRequest(request);
           if (apiResponse) {
             return apiResponse;
-          }
-        }
-
-        // Handle admin panel routes (if enabled)
-        if (url.pathname.startsWith("/admin") && settings.general.ENABLE_ADMIN) {
-          try {
-            // Let static assets (JS/CSS bundles) through without auth
-            if (!isAdminAsset(url.pathname)) {
-              const { authenticateRequest } = await import("~/server/services/auth");
-              const cookies = request.headers.get("cookie");
-              const user = await authenticateRequest(cookies, null);
-
-              if (!user) {
-                const loginUrl = new URL("/auth/login", request.url);
-                loginUrl.searchParams.set("next", url.pathname);
-                return Response.redirect(loginUrl.toString(), 302);
-              }
-
-              if (!user.isAdmin) {
-                return new Response(renderAdminForbiddenPage(), {
-                  status: 403,
-                  headers: { "Content-Type": "text/html; charset=utf-8" },
-                });
-              }
-            }
-
-            const adminRouter = await getAdminRouter();
-            return adminRouter.fetch(request);
-          } catch (error) {
-            logger.error('Admin panel error', { error: error instanceof Error ? error.message : String(error) });
-            return new Response(`Admin Error: ${error}`, { status: 500 });
           }
         }
 

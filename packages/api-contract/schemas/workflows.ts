@@ -25,21 +25,6 @@ export const importN8nWorkflowSchema = z.object({
   name: z.string().optional(),
 });
 
-export const workflowBuilderChatSchema = z.object({
-  message: z.string().min(1),
-  context: z.object({
-    existingCode: z.string().optional(),
-    providers: z.array(z.string()).optional(),
-    triggers: z.array(z.string()).optional(),
-    secrets: z.array(z.string()).optional(),
-  }).optional(),
-  options: z.object({
-    model: z.string().optional(),
-    temperature: z.number().optional(),
-    stream: z.boolean().optional(),
-  }).optional(),
-});
-
 // ============================================================================
 // Response schemas (from src/types/api.ts)
 // ============================================================================
@@ -105,7 +90,6 @@ export const foldersListResponseSchema = z.object({
 export type CreateWorkflowInput = z.infer<typeof createWorkflowSchema>;
 export type UpdateWorkflowInput = z.infer<typeof updateWorkflowSchema>;
 export type ImportN8nWorkflowInput = z.infer<typeof importN8nWorkflowSchema>;
-export type WorkflowBuilderChatInput = z.infer<typeof workflowBuilderChatSchema>;
 
 export type CreatedByUser = z.infer<typeof createdByUserSchema>;
 export type Workflow = z.infer<typeof workflowSchema>;

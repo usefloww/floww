@@ -133,7 +133,6 @@ const GeneralConfigSchema = z.object({
   BACKEND_URL: z.string().url().default('http://localhost:8000'),
   PUBLIC_API_URL: z.preprocess((val) => (val === '' ? undefined : val), z.string().url().optional()),
   ENABLE_ADMIN: z.boolean().default(true),
-  ENABLE_AI_BUILDER: z.boolean().default(false),
   SINGLE_ORG_MODE: z.boolean().default(false),
   SINGLE_ORG_NAME: z.string().default('default'),
   SINGLE_ORG_DISPLAY_NAME: z.string().default('Default Organization'),
@@ -147,7 +146,6 @@ const GeneralConfigSchema = z.object({
 
 function loadGeneralConfig(): z.infer<typeof GeneralConfigSchema> {
   const enableAdmin = getEnvWithSecret('ENABLE_ADMIN');
-  const enableAiBuilder = getEnvWithSecret('ENABLE_AI_BUILDER');
   const singleOrgMode = getEnvWithSecret('SINGLE_ORG_MODE');
   const isCloud = getEnvWithSecret('IS_CLOUD');
   const tracesSampleRate = getEnvWithSecret('SENTRY_TRACES_SAMPLE_RATE');
@@ -157,7 +155,6 @@ function loadGeneralConfig(): z.infer<typeof GeneralConfigSchema> {
     BACKEND_URL: getEnvWithSecret('BACKEND_URL') || 'http://localhost:8000',
     PUBLIC_API_URL: getEnvWithSecret('PUBLIC_API_URL'),
     ENABLE_ADMIN: enableAdmin !== 'false' && enableAdmin !== '0',
-    ENABLE_AI_BUILDER: enableAiBuilder === 'true' || enableAiBuilder === '1',
     SINGLE_ORG_MODE: singleOrgMode === 'true' || singleOrgMode === '1',
     SINGLE_ORG_NAME: getEnvWithSecret('SINGLE_ORG_NAME') || 'default',
     SINGLE_ORG_DISPLAY_NAME: getEnvWithSecret('SINGLE_ORG_DISPLAY_NAME') || 'Default Organization',

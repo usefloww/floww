@@ -46,7 +46,6 @@ export const backendConfigResponseSchema = z.object({
   features: z.object({
     billing: z.boolean(),
     singleOrg: z.boolean(),
-    aiBuilder: z.boolean(),
   }),
   limits: z.object({
     maxWorkflows: z.number(),

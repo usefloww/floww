@@ -14,12 +14,18 @@ import { Route as SetupRouteImport } from './routes/setup'
 import { Route as ProvidersRouteImport } from './routes/providers'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkflowsIndexRouteImport } from './routes/workflows/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminResourceIndexRouteImport } from './routes/admin/$resource/index'
 import { Route as WorkflowsWorkflowIdDeploymentsRouteImport } from './routes/workflows/$workflowId.deployments'
+import { Route as AdminResourceNewRouteImport } from './routes/admin/$resource/new'
+import { Route as AdminResourceRecordIdIndexRouteImport } from './routes/admin/$resource/$recordId/index'
 import { Route as WorkflowsWorkflowIdExecutionsExecutionIdRouteImport } from './routes/workflows/$workflowId.executions.$executionId'
+import { Route as AdminResourceRecordIdEditRouteImport } from './routes/admin/$resource/$recordId/edit'
 import { Route as WorkflowsWorkflowIdDeploymentsDeploymentIdEditRouteImport } from './routes/workflows/$workflowId.deployments.$deploymentId.edit'
 
 const UpgradeRoute = UpgradeRouteImport.update({
@@ -47,6 +53,11 @@ const CheckoutRoute = CheckoutRouteImport.update({
   path: '/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRouteRoute = AdminRouteRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -67,17 +78,44 @@ const ProfileIndexRoute = ProfileIndexRouteImport.update({
   path: '/profile/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminResourceIndexRoute = AdminResourceIndexRouteImport.update({
+  id: '/$resource/',
+  path: '/$resource/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const WorkflowsWorkflowIdDeploymentsRoute =
   WorkflowsWorkflowIdDeploymentsRouteImport.update({
     id: '/workflows/$workflowId/deployments',
     path: '/workflows/$workflowId/deployments',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminResourceNewRoute = AdminResourceNewRouteImport.update({
+  id: '/$resource/new',
+  path: '/$resource/new',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminResourceRecordIdIndexRoute =
+  AdminResourceRecordIdIndexRouteImport.update({
+    id: '/$resource/$recordId/',
+    path: '/$resource/$recordId/',
+    getParentRoute: () => AdminRouteRoute,
+  } as any)
 const WorkflowsWorkflowIdExecutionsExecutionIdRoute =
   WorkflowsWorkflowIdExecutionsExecutionIdRouteImport.update({
     id: '/workflows/$workflowId/executions/$executionId',
     path: '/workflows/$workflowId/executions/$executionId',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const AdminResourceRecordIdEditRoute =
+  AdminResourceRecordIdEditRouteImport.update({
+    id: '/$resource/$recordId/edit',
+    path: '/$resource/$recordId/edit',
+    getParentRoute: () => AdminRouteRoute,
   } as any)
 const WorkflowsWorkflowIdDeploymentsDeploymentIdEditRoute =
   WorkflowsWorkflowIdDeploymentsDeploymentIdEditRouteImport.update({
@@ -88,16 +126,22 @@ const WorkflowsWorkflowIdDeploymentsDeploymentIdEditRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
   '/providers': typeof ProvidersRoute
   '/setup': typeof SetupRoute
   '/upgrade': typeof UpgradeRoute
+  '/admin/': typeof AdminIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/workflows': typeof WorkflowsIndexRoute
+  '/admin/$resource/new': typeof AdminResourceNewRoute
   '/workflows/$workflowId/deployments': typeof WorkflowsWorkflowIdDeploymentsRouteWithChildren
+  '/admin/$resource': typeof AdminResourceIndexRoute
+  '/admin/$resource/$recordId/edit': typeof AdminResourceRecordIdEditRoute
   '/workflows/$workflowId/executions/$executionId': typeof WorkflowsWorkflowIdExecutionsExecutionIdRoute
+  '/admin/$resource/$recordId': typeof AdminResourceRecordIdIndexRoute
   '/workflows/$workflowId/deployments/$deploymentId/edit': typeof WorkflowsWorkflowIdDeploymentsDeploymentIdEditRoute
 }
 export interface FileRoutesByTo {
@@ -107,42 +151,59 @@ export interface FileRoutesByTo {
   '/providers': typeof ProvidersRoute
   '/setup': typeof SetupRoute
   '/upgrade': typeof UpgradeRoute
+  '/admin': typeof AdminIndexRoute
   '/profile': typeof ProfileIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/workflows': typeof WorkflowsIndexRoute
+  '/admin/$resource/new': typeof AdminResourceNewRoute
   '/workflows/$workflowId/deployments': typeof WorkflowsWorkflowIdDeploymentsRouteWithChildren
+  '/admin/$resource': typeof AdminResourceIndexRoute
+  '/admin/$resource/$recordId/edit': typeof AdminResourceRecordIdEditRoute
   '/workflows/$workflowId/executions/$executionId': typeof WorkflowsWorkflowIdExecutionsExecutionIdRoute
+  '/admin/$resource/$recordId': typeof AdminResourceRecordIdIndexRoute
   '/workflows/$workflowId/deployments/$deploymentId/edit': typeof WorkflowsWorkflowIdDeploymentsDeploymentIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
   '/providers': typeof ProvidersRoute
   '/setup': typeof SetupRoute
   '/upgrade': typeof UpgradeRoute
+  '/admin/': typeof AdminIndexRoute
   '/profile/': typeof ProfileIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/workflows/': typeof WorkflowsIndexRoute
+  '/admin/$resource/new': typeof AdminResourceNewRoute
   '/workflows/$workflowId/deployments': typeof WorkflowsWorkflowIdDeploymentsRouteWithChildren
+  '/admin/$resource/': typeof AdminResourceIndexRoute
+  '/admin/$resource/$recordId/edit': typeof AdminResourceRecordIdEditRoute
   '/workflows/$workflowId/executions/$executionId': typeof WorkflowsWorkflowIdExecutionsExecutionIdRoute
+  '/admin/$resource/$recordId/': typeof AdminResourceRecordIdIndexRoute
   '/workflows/$workflowId/deployments/$deploymentId/edit': typeof WorkflowsWorkflowIdDeploymentsDeploymentIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/checkout'
     | '/login'
     | '/providers'
     | '/setup'
     | '/upgrade'
+    | '/admin/'
     | '/profile'
     | '/settings'
     | '/workflows'
+    | '/admin/$resource/new'
     | '/workflows/$workflowId/deployments'
+    | '/admin/$resource'
+    | '/admin/$resource/$recordId/edit'
     | '/workflows/$workflowId/executions/$executionId'
+    | '/admin/$resource/$recordId'
     | '/workflows/$workflowId/deployments/$deploymentId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -152,30 +213,42 @@ export interface FileRouteTypes {
     | '/providers'
     | '/setup'
     | '/upgrade'
+    | '/admin'
     | '/profile'
     | '/settings'
     | '/workflows'
+    | '/admin/$resource/new'
     | '/workflows/$workflowId/deployments'
+    | '/admin/$resource'
+    | '/admin/$resource/$recordId/edit'
     | '/workflows/$workflowId/executions/$executionId'
+    | '/admin/$resource/$recordId'
     | '/workflows/$workflowId/deployments/$deploymentId/edit'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/checkout'
     | '/login'
     | '/providers'
     | '/setup'
     | '/upgrade'
+    | '/admin/'
     | '/profile/'
     | '/settings/'
     | '/workflows/'
+    | '/admin/$resource/new'
     | '/workflows/$workflowId/deployments'
+    | '/admin/$resource/'
+    | '/admin/$resource/$recordId/edit'
     | '/workflows/$workflowId/executions/$executionId'
+    | '/admin/$resource/$recordId/'
     | '/workflows/$workflowId/deployments/$deploymentId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRouteRoute: typeof AdminRouteRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
   LoginRoute: typeof LoginRoute
   ProvidersRoute: typeof ProvidersRoute
@@ -225,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -253,6 +333,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/$resource/': {
+      id: '/admin/$resource/'
+      path: '/$resource'
+      fullPath: '/admin/$resource'
+      preLoaderRoute: typeof AdminResourceIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/workflows/$workflowId/deployments': {
       id: '/workflows/$workflowId/deployments'
       path: '/workflows/$workflowId/deployments'
@@ -260,12 +354,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkflowsWorkflowIdDeploymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/$resource/new': {
+      id: '/admin/$resource/new'
+      path: '/$resource/new'
+      fullPath: '/admin/$resource/new'
+      preLoaderRoute: typeof AdminResourceNewRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/$resource/$recordId/': {
+      id: '/admin/$resource/$recordId/'
+      path: '/$resource/$recordId'
+      fullPath: '/admin/$resource/$recordId'
+      preLoaderRoute: typeof AdminResourceRecordIdIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/workflows/$workflowId/executions/$executionId': {
       id: '/workflows/$workflowId/executions/$executionId'
       path: '/workflows/$workflowId/executions/$executionId'
       fullPath: '/workflows/$workflowId/executions/$executionId'
       preLoaderRoute: typeof WorkflowsWorkflowIdExecutionsExecutionIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/$resource/$recordId/edit': {
+      id: '/admin/$resource/$recordId/edit'
+      path: '/$resource/$recordId/edit'
+      fullPath: '/admin/$resource/$recordId/edit'
+      preLoaderRoute: typeof AdminResourceRecordIdEditRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/workflows/$workflowId/deployments/$deploymentId/edit': {
       id: '/workflows/$workflowId/deployments/$deploymentId/edit'
@@ -276,6 +391,26 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AdminRouteRouteChildren {
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminResourceNewRoute: typeof AdminResourceNewRoute
+  AdminResourceIndexRoute: typeof AdminResourceIndexRoute
+  AdminResourceRecordIdEditRoute: typeof AdminResourceRecordIdEditRoute
+  AdminResourceRecordIdIndexRoute: typeof AdminResourceRecordIdIndexRoute
+}
+
+const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminIndexRoute: AdminIndexRoute,
+  AdminResourceNewRoute: AdminResourceNewRoute,
+  AdminResourceIndexRoute: AdminResourceIndexRoute,
+  AdminResourceRecordIdEditRoute: AdminResourceRecordIdEditRoute,
+  AdminResourceRecordIdIndexRoute: AdminResourceRecordIdIndexRoute,
+}
+
+const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
+  AdminRouteRouteChildren,
+)
 
 interface WorkflowsWorkflowIdDeploymentsRouteChildren {
   WorkflowsWorkflowIdDeploymentsDeploymentIdEditRoute: typeof WorkflowsWorkflowIdDeploymentsDeploymentIdEditRoute
@@ -294,6 +429,7 @@ const WorkflowsWorkflowIdDeploymentsRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRouteRoute: AdminRouteRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
   LoginRoute: LoginRoute,
   ProvidersRoute: ProvidersRoute,

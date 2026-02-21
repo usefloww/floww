@@ -1,10 +1,9 @@
-import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
-import { useState, lazy, Suspense, useEffect } from "react";
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Code, Package, Activity, Settings, FileText, Sparkles, PlayCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Code, Package, Activity, Settings, FileText, PlayCircle } from "lucide-react";
 import { handleApiError } from "@/lib/api";
 import { getWorkflow } from "@/lib/server/workflows";
-import { getConfig } from "@/lib/server/config";
 import { Loader } from "@/components/Loader";
 import { DeploymentEditor } from "@/components/DeploymentEditor";
 import { DeploymentHistory } from "@/components/DeploymentHistory";
@@ -13,25 +12,8 @@ import { WorkflowConfiguration } from "@/components/WorkflowConfiguration";
 import { WorkflowLogs } from "@/components/WorkflowLogs";
 import { ManualTriggersSection } from "@/components/ManualTriggersSection";
 import { useNamespaceStore } from "@/stores/namespaceStore";
-import { ClientOnly } from "@/components/ClientOnly";
 
-// Lazy load WorkflowBuilder since it includes heavy dependencies (@llamaindex/chat-ui, monaco-editor)
-// This is wrapped in ClientOnly to completely skip SSR for this component
-const WorkflowBuilder = lazy(() => import("@/components/WorkflowBuilder").then(m => ({ default: m.WorkflowBuilder })));
-
-// Loading fallback for lazy-loaded components
-function TabLoadingFallback() {
-  return (
-    <div className="flex items-center justify-center h-[400px]">
-      <div className="flex flex-col items-center gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">Loading...</span>
-      </div>
-    </div>
-  );
-}
-
-type TabType = "edit" | "deployments" | "executions" | "logs" | "config" | "builder" | "triggers";
+type TabType = "edit" | "deployments" | "executions" | "logs" | "config" | "triggers";
 
 export const Route = createFileRoute("/workflows/$workflowId/deployments")({
   component: DeploymentsPage,
@@ -60,15 +42,6 @@ function DeploymentsPage() {
   const [activeTab, setActiveTab] = useState<TabType>((tab || "edit") as TabType);
   const [selectedDeploymentId, setSelectedDeploymentId] = useState<string | null>(null);
   const { currentNamespace } = useNamespaceStore();
-  const navigate = useNavigate();
-
-  // Fetch config to check if AI Builder is enabled
-  const { data: config } = useQuery({
-    queryKey: ['config'],
-    queryFn: () => getConfig(),
-  });
-
-  const isAiBuilderEnabled = config?.features.aiBuilder ?? false;
 
   // Fetch workflow to get the name
   const { data: workflow, isLoading, error } = useQuery({
@@ -77,19 +50,6 @@ function DeploymentsPage() {
   });
 
   const errorMessage = error ? handleApiError(error) : null;
-
-  // Redirect from builder tab if AI Builder is disabled
-  useEffect(() => {
-    if (tab === "builder" && !isAiBuilderEnabled && config !== undefined) {
-      navigate({
-        to: "/workflows/$workflowId/deployments",
-        params: { workflowId },
-        search: { tab: "edit" },
-        replace: true,
-      } as any);
-      setActiveTab("edit");
-    }
-  }, [tab, isAiBuilderEnabled, config, workflowId, navigate]);
 
   const handleEdit = (deploymentId: string) => {
     setSelectedDeploymentId(deploymentId);
@@ -222,26 +182,6 @@ function DeploymentsPage() {
               <span>Configuration</span>
             </div>
           </Link>
-          {isAiBuilderEnabled && (
-            <Link
-              {...({
-                to: "/workflows/$workflowId/deployments",
-                params: { workflowId },
-                search: { tab: "builder" },
-                className: `py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === "builder"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                }`
-              } as any)}
-              onClick={() => setActiveTab("builder")}
-            >
-              <div className="flex items-center space-x-2">
-                <Sparkles className="h-4 w-4" />
-                <span>Builder</span>
-              </div>
-            </Link>
-          )}
           <Link
             {...({
               to: "/workflows/$workflowId/deployments",
@@ -291,12 +231,6 @@ function DeploymentsPage() {
               namespaceId={currentNamespace.id}
             />
           ) : null
-        ) : activeTab === "builder" && isAiBuilderEnabled ? (
-          <ClientOnly fallback={<TabLoadingFallback />}>
-            <Suspense fallback={<TabLoadingFallback />}>
-              <WorkflowBuilder workflowId={workflowId} />
-            </Suspense>
-          </ClientOnly>
         ) : activeTab === "triggers" ? (
           <ManualTriggersSection workflowId={workflowId} />
         ) : null}

@@ -8,7 +8,6 @@ import path from 'path';
 
 // Heavy client-only packages that should be externalized from SSR
 const clientOnlyPackages = [
-  '@llamaindex/chat-ui',
   'react-pdf',
   'pdfjs-dist',
   '@codesandbox/sandpack-react',
@@ -36,7 +35,7 @@ export default defineConfig({
     exclude: ['cpu-features', 'ssh2'],
   },
   ssr: {
-    external: [...clientOnlyPackages, 'cpu-features', 'ssh2', 'adminjs', 'adminjs-drizzle'],
+    external: [...clientOnlyPackages, 'cpu-features', 'ssh2'],
   },
   build: {
     // Increase chunk size warning limit
