@@ -9,21 +9,14 @@ import { Database, Resource } from 'adminjs-drizzle/pg';
 import { Hono } from 'hono';
 import { getDb } from '../db';
 import * as schema from '../db/schema';
-import { buildRouter, buildAuthenticatedRouter } from './hono-adapter';
+import { buildRouter } from './hono-adapter';
 import { logger } from '~/server/utils/logger';
 
 // Register the Drizzle adapter
 AdminJS.registerAdapter({ Database, Resource });
 
-/**
- * Admin panel configuration
- */
 export interface AdminConfig {
   rootPath?: string;
-  credentials?: {
-    email: string;
-    password: string;
-  };
 }
 
 /**
@@ -209,24 +202,12 @@ export async function createAdmin(config: AdminConfig): Promise<AdminJS> {
 }
 
 /**
- * Create admin routes handler using Hono with AdminJS
+ * Create admin routes handler using Hono with AdminJS.
+ * Authentication is handled externally in src/server.ts before
+ * requests reach these routes.
  */
 export async function createAdminRouter(config: AdminConfig): Promise<Hono> {
   const admin = await createAdmin(config);
-  
-  // If credentials are provided, use authenticated router
-  if (config.credentials) {
-    return buildAuthenticatedRouter(admin, {
-      authenticate: async (email, password) => {
-        if (email === config.credentials!.email && password === config.credentials!.password) {
-          return { email };
-        }
-        return null;
-      },
-    });
-  }
-
-  // Otherwise use unauthenticated router
   return buildRouter(admin);
 }
 

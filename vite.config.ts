@@ -32,9 +32,11 @@ export default defineConfig({
       })
     ] : []),
   ],
+  optimizeDeps: {
+    exclude: ['cpu-features', 'ssh2'],
+  },
   ssr: {
-    // Externalize heavy client-only packages and native modules from SSR
-    external: [...clientOnlyPackages],
+    external: [...clientOnlyPackages, 'cpu-features', 'ssh2'],
   },
   build: {
     // Increase chunk size warning limit

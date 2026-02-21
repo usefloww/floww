@@ -55,3 +55,32 @@ services:
       CENTRIFUGO_CONNECT_PROXY_ENDPOINT: "http://host.docker.internal:5173/api/centrifugo/connect"
       CENTRIFUGO_SUBSCRIBE_PROXY_ENDPOINT: "http://host.docker.internal:5173/api/centrifugo/subscribe"
     restart: unless-stopped
+
+  # ============================================================================
+  # Production profile — test the exact production build locally
+  # Usage: docker compose --profile production up --build
+  # ============================================================================
+
+  # Production app server (exact same image as deployed)
+  app:
+    container_name: floww-app-prod
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://admin:secret@db:5432/postgres
+      - CENTRIFUGO_PUBLIC_URL=http://localhost:8000
+    depends_on:
+      db:
+        condition: service_healthy
+      centrifugo:
+        condition: service_started
+    restart: unless-stopped
+    profiles:
+      - app

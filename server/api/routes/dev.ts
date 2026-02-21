@@ -16,12 +16,6 @@ import { syncTriggers } from '~/server/services/trigger-service';
 post('/dev/sync-triggers', async ({ user }) => {
   if (!user) return errorResponse('Unauthorized', 401);
 
-  // Check environment at runtime, not module load time
-  const isDev = process.env.NODE_ENV !== 'production';
-  if (!isDev && !user.isAdmin) {
-    return errorResponse('This endpoint is only available in development mode', 403);
-  }
-
   const db = getDb();
 
   // Get all active deployments
