@@ -15,7 +15,7 @@ import { z } from 'zod';
 import { get, post, patch, del, json, errorResponse, parseBody } from '~/server/api/router';
 import { hasWorkflowAccess } from '~/server/services/access-service';
 import * as workflowService from '~/server/services/workflow-service';
-import { getDefaultRuntimeId } from '~/server/services/default-runtime';
+import { getDefaultRuntimeId, getOrCreateDefaultRuntimeForVersion } from '~/server/services/default-runtime';
 import * as runtimeService from '~/server/services/runtime-service';
 import { syncTriggers, type TriggerMetadata, type WebhookInfo } from '~/server/services/trigger-service';
 import { getRuntime } from '~/server/packages/runtimes';
@@ -29,6 +29,7 @@ import { logger } from '~/server/utils/logger';
 const createWorkflowDeploymentSchema = z.object({
   workflowId: z.string().min(1, 'workflowId is required'),
   runtimeId: z.string().optional(),
+  sdkVersion: z.string().optional(),
   code: z.object({
     files: z.record(z.string(), z.string()),
     entrypoint: z.string(),
@@ -171,6 +172,7 @@ get('/workflow-deployments', async (ctx) => {
         status: d.status,
         deployedAt: d.deployedAt instanceof Date ? d.deployedAt.toISOString() : d.deployedAt,
         note: d.note,
+        providerMappings: d.providerMappings,
       })),
     });
   }
@@ -188,7 +190,7 @@ post('/workflow-deployments', async (ctx) => {
   const parsed = await parseBody(request, createWorkflowDeploymentSchema);
   if ('error' in parsed) return parsed.error;
 
-  const { workflowId, runtimeId: requestedRuntimeId, code, providerMappings } = parsed.data;
+  const { workflowId, runtimeId: requestedRuntimeId, sdkVersion, code, providerMappings } = parsed.data;
 
   // Verify user has access to the workflow
   const workflow = await workflowService.getWorkflow(workflowId);
@@ -201,8 +203,15 @@ post('/workflow-deployments', async (ctx) => {
     return errorResponse('Access denied', 403);
   }
 
-  // Resolve runtime_id: use provided value or fall back to default
+  // Resolve runtime_id: use provided value, sdkVersion lookup, or fall back to default
   let runtimeId = requestedRuntimeId;
+  if (!runtimeId && sdkVersion) {
+    runtimeId = (await getOrCreateDefaultRuntimeForVersion(sdkVersion)) ?? undefined;
+    if (!runtimeId) {
+      return errorResponse(`No default runtime available for SDK version ${sdkVersion}`, 400);
+    }
+    logger.info('Using versioned default runtime', { runtimeId, sdkVersion });
+  }
   if (!runtimeId) {
     runtimeId = (await getDefaultRuntimeId()) ?? undefined;
     if (!runtimeId) {
@@ -359,6 +368,7 @@ get('/workflow-deployments/:deploymentId', async (ctx) => {
       status: deployment.status,
       deployedAt: deployment.deployedAt instanceof Date ? deployment.deployedAt.toISOString() : deployment.deployedAt,
       note: deployment.note,
+      providerMappings: deployment.providerMappings,
     });
   } catch (error) {
     // Database errors (e.g., invalid UUID format) should return 404

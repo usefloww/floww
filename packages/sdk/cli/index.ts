@@ -12,6 +12,7 @@ import {
 import { setConfig } from "./config/configUtils";
 import { deployCommand } from "./commands/deploy";
 import { initCommand } from "./commands/init";
+import { pullCommand } from "./commands/pull";
 import {
   listWorkflowsCommand,
   listNamespacesCommand,
@@ -82,6 +83,15 @@ program
     "Deploy triggers to the server (uses entrypoint from floww.yaml)"
   )
   .action(deployCommand);
+
+program
+  .command("pull [workflow]")
+  .description("Pull an existing workflow's deployed source code")
+  .option("-o, --output-dir <dir>", "Output directory (default: cwd)")
+  .option("--json", "JSON output")
+  .action(async (workflow, options) => {
+    await pullCommand(workflow, options);
+  });
 
 program.command("login").description("Login to Floww").action(loginCommand);
 

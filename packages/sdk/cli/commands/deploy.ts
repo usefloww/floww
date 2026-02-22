@@ -34,20 +34,6 @@ import { getValidAuth } from "../auth/tokenUtils";
 import { autoPopulateProviderMappings } from "../runtime/providerMapping";
 import { ProviderMappings } from "../config/projectConfig";
 
-const defaultDockerfileContent = `
-FROM ghcr.io/usefloww/lambda-runtime:latest
-
-# Install project dependencies (including SDK)
-COPY package.json package-lock.json* pnpm-lock.yaml* ./
-RUN npm install --omit=dev
-
-# Set entrypoint from config
-ENV FLOWW_ENTRYPOINT=main.ts
-
-# No source code copying - code will be provided via Lambda event payload
-# SDK must be listed in package.json dependencies
-`;
-
 function ensureDockerfile(
   projectDir: string,
   projectConfig: ProjectConfig
@@ -62,21 +48,59 @@ function ensureDockerfile(
     return dockerfilePath;
   }
 
-  // Otherwise, fall back to default behavior (create if missing)
+  // Check for Dockerfile in project directory
   const dockerfilePath = path.join(projectDir, "Dockerfile");
 
   if (!fs.existsSync(dockerfilePath)) {
-    logger.debugInfo("No Dockerfile found, creating default...");
-    const entrypoint = projectConfig.entrypoint || "main.ts";
-    const dockerfileContent = defaultDockerfileContent.replace(
-      "ENV FLOWW_ENTRYPOINT=main.ts",
-      `ENV FLOWW_ENTRYPOINT=${entrypoint}`
+    throw new Error(
+      "No Dockerfile found. Either create a Dockerfile for a custom build, " +
+      "or remove any build configuration to use the default runtime."
     );
-    fs.writeFileSync(dockerfilePath, dockerfileContent.trim());
-    logger.debugInfo("Created default Dockerfile");
   }
 
   return dockerfilePath;
+}
+
+/**
+ * Check if the project should use the default runtime (no Dockerfile, no build config).
+ */
+function shouldUseDefaultRuntime(
+  projectDir: string,
+  projectConfig: ProjectConfig
+): boolean {
+  if (projectConfig.build?.dockerfile) {
+    return false;
+  }
+  const dockerfilePath = path.join(projectDir, "Dockerfile");
+  return !fs.existsSync(dockerfilePath);
+}
+
+/**
+ * Read the floww SDK version from package.json dependencies.
+ * Strips semver prefixes (^, ~).
+ */
+function readSdkVersion(projectDir: string): string | null {
+  const packageJsonPath = path.join(projectDir, "package.json");
+  if (!fs.existsSync(packageJsonPath)) {
+    return null;
+  }
+
+  try {
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+    const version =
+      packageJson.dependencies?.floww ??
+      packageJson.dependencies?.["@floww/sdk"] ??
+      null;
+
+    if (!version || version === "*" || version === "latest") {
+      return null;
+    }
+
+    // Strip semver prefixes
+    return version.replace(/^[\^~>=<]+/, "");
+  } catch {
+    return null;
+  }
 }
 
 async function pollRuntimeUntilReady(runtimeId: string): Promise<void> {
@@ -368,119 +392,142 @@ export async function deployCommand() {
 
   console.log("🚀 Starting deployment...");
 
-  // 3. Ensure Dockerfile exists
-  ensureDockerfile(projectDir, projectConfig);
+  const useDefaultRuntime = shouldUseDefaultRuntime(projectDir, projectConfig);
 
-  // 3.5. Pre-build SDK if in monorepo (for faster Docker builds)
-  const isInSdkExamples = projectDir.includes("/examples/");
-  if (isInSdkExamples) {
-    await logger.debugTask("Pre-building SDK", async () => {
-      const { execSync } = await import("child_process");
-      const sdkDir = `${projectDir}/../..`;
-
-      // Install and build SDK, remove self-referential link, and pack
-      execSync(
-        `
-        pnpm install &&
-        pnpm build &&
-        node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); delete pkg.dependencies['@DeveloperFlows/floww-sdk']; delete pkg.dependencies['floww']; fs.writeFileSync('package.json',JSON.stringify(pkg,null,2));" &&
-        pnpm pack --pack-destination ./ &&
-        git checkout package.json
-      `,
-        {
-          cwd: sdkDir,
-          stdio: logger.interactive ? "pipe" : "inherit",
-          shell: "/bin/bash",
-          env: process.env,
-        }
-      );
-    });
-  }
-
-  // 4. Build Docker image
-  const buildResult = await logger.task(
-    "📦 Building runtime image",
-    async () => {
-      return await dockerBuildImage(projectConfig, projectDir);
-    }
-  );
-
-  const imageHash = await dockerGetImageHash({
-    localImage: buildResult.localImage,
-  });
-
-  const pushData = await getPushData(imageHash);
-
-  // 5. Push images to registry (only if needed)
-  if (pushData !== null) {
-    await logger.task(
-      "☁️  Uploading runtime image (this may take a moment)",
-      async () => {
-        const imageUri = `${pushData.registryUrl}:${imageHash}`;
-        await dockerRetagImage({
-          currentTag: buildResult.localImage,
-          newTag: imageUri,
-        });
-        await dockerLogin({
-          registryUrl: pushData.registryUrl,
-          token: pushData.password,
-        });
-        await dockerPushImage({ imageUri: imageUri });
-      }
-    );
-  } else {
-    logger.debugInfo(
-      "Runtime image already exists in registry, skipping upload"
-    );
-  }
-
-  // 6. Create and prepare runtime
-  const runtimeResult = await logger.task(
-    "⚙️  Setting up runtime environment",
-    async () => {
-      try {
-        const runtime = await createRuntime({
-          config: {
-            imageHash: imageHash,
-          },
-        });
-        await pollRuntimeUntilReady(runtime.id);
-        return runtime;
-      } catch (error) {
-        if (error instanceof RuntimeAlreadyExistsError) {
-          // Fetch the existing runtime status and wait for it to be ready
-          const runtime = await getRuntimeStatus(error.runtimeId);
-          await pollRuntimeUntilReady(runtime.id);
-          return runtime;
-        } else {
-          logger.error(
-            "Failed to create runtime:",
-            error instanceof Error ? error.message : error
-          );
-          process.exit(1);
-        }
-      }
-    }
-  );
-
-  // 7. Read project files
+  // Read project files (needed for both paths)
   const userCode = await readProjectFiles(projectDir, entrypoint);
 
   // Convert triggers to metadata format for API
   const triggersMetadata = convertTriggersToMetadata(executionResult.triggers);
 
-  // 8. Create workflow deployment with triggers metadata
+  const deploymentPayload: {
+    workflowId: string;
+    runtimeId?: string;
+    sdkVersion?: string;
+    code: typeof userCode;
+    triggers: typeof triggersMetadata;
+    providerMappings?: ProviderMappings;
+  } = {
+    workflowId: projectConfig.workflowId!,
+    code: userCode,
+    triggers: triggersMetadata,
+    providerMappings: providerMappings && Object.keys(providerMappings).length > 0
+      ? providerMappings
+      : undefined,
+  };
+
+  if (useDefaultRuntime) {
+    // Default runtime path: skip Docker build entirely
+    const sdkVersion = readSdkVersion(projectDir);
+    if (sdkVersion) {
+      logger.debugInfo(`Using default runtime for SDK version ${sdkVersion}`);
+      deploymentPayload.sdkVersion = sdkVersion;
+    } else {
+      logger.debugInfo("Using default runtime (no specific SDK version detected)");
+    }
+  } else {
+    // Custom Docker build path
+    ensureDockerfile(projectDir, projectConfig);
+
+    // Pre-build SDK if in monorepo (for faster Docker builds)
+    const isInSdkExamples = projectDir.includes("/examples/");
+    if (isInSdkExamples) {
+      await logger.debugTask("Pre-building SDK", async () => {
+        const { execSync } = await import("child_process");
+        const sdkDir = `${projectDir}/../..`;
+
+        // Install and build SDK, remove self-referential link, and pack
+        execSync(
+          `
+          pnpm install &&
+          pnpm build &&
+          node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); delete pkg.dependencies['@DeveloperFlows/floww-sdk']; delete pkg.dependencies['floww']; fs.writeFileSync('package.json',JSON.stringify(pkg,null,2));" &&
+          pnpm pack --pack-destination ./ &&
+          git checkout package.json
+        `,
+          {
+            cwd: sdkDir,
+            stdio: logger.interactive ? "pipe" : "inherit",
+            shell: "/bin/bash",
+            env: process.env,
+          }
+        );
+      });
+    }
+
+    // Build Docker image
+    const buildResult = await logger.task(
+      "📦 Building runtime image",
+      async () => {
+        return await dockerBuildImage(projectConfig, projectDir);
+      }
+    );
+
+    const imageHash = await dockerGetImageHash({
+      localImage: buildResult.localImage,
+    });
+
+    const pushData = await getPushData(imageHash);
+
+    // Push images to registry (only if needed)
+    if (pushData !== null) {
+      await logger.task(
+        "☁️  Uploading runtime image (this may take a moment)",
+        async () => {
+          const imageUri = `${pushData.registryUrl}:${imageHash}`;
+          await dockerRetagImage({
+            currentTag: buildResult.localImage,
+            newTag: imageUri,
+          });
+          await dockerLogin({
+            registryUrl: pushData.registryUrl,
+            token: pushData.password,
+          });
+          await dockerPushImage({ imageUri: imageUri });
+        }
+      );
+    } else {
+      logger.debugInfo(
+        "Runtime image already exists in registry, skipping upload"
+      );
+    }
+
+    // Create and prepare runtime
+    const runtimeResult = await logger.task(
+      "⚙️  Setting up runtime environment",
+      async () => {
+        try {
+          const runtime = await createRuntime({
+            config: {
+              imageHash: imageHash,
+            },
+          });
+          await pollRuntimeUntilReady(runtime.id);
+          return runtime;
+        } catch (error) {
+          if (error instanceof RuntimeAlreadyExistsError) {
+            // Fetch the existing runtime status and wait for it to be ready
+            const runtime = await getRuntimeStatus(error.runtimeId);
+            await pollRuntimeUntilReady(runtime.id);
+            return runtime;
+          } else {
+            logger.error(
+              "Failed to create runtime:",
+              error instanceof Error ? error.message : error
+            );
+            process.exit(1);
+          }
+        }
+      }
+    );
+
+    deploymentPayload.runtimeId = runtimeResult.id;
+  }
+
+  // Create workflow deployment
   try {
     const deployment = await logger.task("🚀 Deploying workflow", async () => {
-      return await createWorkflowDeployment({
-        workflowId: projectConfig.workflowId!,
-        runtimeId: runtimeResult.id,
-        code: userCode,
-        triggers: triggersMetadata,
-        providerMappings: providerMappings && Object.keys(providerMappings).length > 0
-          ? providerMappings
-          : undefined,
-      });
+      return await createWorkflowDeployment(deploymentPayload);
     });
 
     console.log("\n✨ Deployment successful!");

@@ -66,7 +66,8 @@ export interface WebhookInfo {
 
 export interface WorkflowDeploymentCreateRequest {
   workflowId: string;
-  runtimeId: string;
+  runtimeId?: string;
+  sdkVersion?: string;
   code: WorkflowDeploymentUserCode;
   triggers?: TriggerMetadata[];
   providerMappings?: Record<string, Record<string, string>>;
@@ -84,6 +85,7 @@ export interface WorkflowDeploymentResponse {
   note?: string;
   userCode?: WorkflowDeploymentUserCode;
   webhooks?: WebhookInfo[];
+  providerMappings?: Record<string, Record<string, string>>;
 }
 
 export interface PushTokenResponse {
@@ -285,6 +287,13 @@ export async function listWorkflowDeployments(
     results: WorkflowDeploymentResponse[];
   }>(`/workflow-deployments${queryParams}`);
   return data.results;
+}
+
+export async function fetchActiveDeployment(
+  workflowId: string
+): Promise<WorkflowDeploymentResponse | null> {
+  const deployments = await listWorkflowDeployments(workflowId);
+  return deployments.find((d) => d.status === "ACTIVE") ?? null;
 }
 
 // ============================================================================

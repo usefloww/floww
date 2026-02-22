@@ -208,6 +208,94 @@ export async function markDefaultRuntimeCompleted(logs?: unknown[]): Promise<voi
 }
 
 /**
+ * Get or create a default runtime for a specific SDK version.
+ *
+ * Assumes the Docker image already exists in the registry (pre-built in CI).
+ * The runtime creation pipeline (Lambda/Docker) pulls it as usual.
+ *
+ * @returns runtime ID if available, null if the runtime creation failed
+ */
+export async function getOrCreateDefaultRuntimeForVersion(sdkVersion: string): Promise<string | null> {
+  const registryUrl = settings.runtime.REGISTRY_URL_RUNTIME;
+  if (!registryUrl) {
+    logger.warn('REGISTRY_URL_RUNTIME not configured, cannot resolve versioned default runtime');
+    return null;
+  }
+
+  const imageUri = `${registryUrl}:default-v${sdkVersion}`;
+  const configHash = generateConfigHashFromUri(imageUri);
+  const configKey = `default_runtime_v_${sdkVersion}`;
+
+  logger.info('Resolving versioned default runtime', { sdkVersion, imageUri, configHash });
+
+  const db = getDb();
+
+  // Check if runtime already exists with this config hash
+  const [existingRuntime] = await db
+    .select()
+    .from(runtimes)
+    .where(eq(runtimes.configHash, configHash))
+    .limit(1);
+
+  if (existingRuntime) {
+    if (existingRuntime.creationStatus === 'COMPLETED' || existingRuntime.creationStatus === 'IN_PROGRESS') {
+      logger.info('Versioned default runtime found', {
+        sdkVersion,
+        runtimeId: existingRuntime.id,
+        status: existingRuntime.creationStatus,
+      });
+      return existingRuntime.id;
+    }
+
+    if (existingRuntime.creationStatus === 'FAILED') {
+      logger.error('Versioned default runtime creation previously failed', {
+        sdkVersion,
+        runtimeId: existingRuntime.id,
+      });
+      return null;
+    }
+  }
+
+  // Create new runtime record
+  const [runtime] = await db
+    .insert(runtimes)
+    .values({
+      id: generateUlidUuid(),
+      configHash,
+      config: { image_uri: imageUri, sdk_version: sdkVersion, is_default: true },
+      creationStatus: 'IN_PROGRESS',
+      creationLogs: [],
+    })
+    .returning();
+
+  logger.info('Created versioned default runtime record', { sdkVersion, runtimeId: runtime.id });
+
+  // Store version mapping in configurations table
+  const [existingVersionConfig] = await db
+    .select()
+    .from(configurations)
+    .where(eq(configurations.key, configKey))
+    .limit(1);
+
+  if (existingVersionConfig) {
+    await db
+      .update(configurations)
+      .set({
+        value: { runtime_id: runtime.id },
+        updatedAt: new Date(),
+      })
+      .where(eq(configurations.key, configKey));
+  } else {
+    await db.insert(configurations).values({
+      key: configKey,
+      value: { runtime_id: runtime.id },
+    });
+  }
+
+  return runtime.id;
+}
+
+/**
  * Mark default runtime as failed
  */
 export async function markDefaultRuntimeFailed(logs?: unknown[]): Promise<void> {
