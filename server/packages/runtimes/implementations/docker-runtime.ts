@@ -24,6 +24,7 @@ import {
 export interface DockerRuntimeConfig {
   repositoryName: string;
   registryUrl: string;
+  backendUrl: string;
 }
 
 export class DockerRuntime extends BaseRuntime {
@@ -31,11 +32,13 @@ export class DockerRuntime extends BaseRuntime {
 
   private repositoryName: string;
   private registryUrl: string;
+  private backendUrl: string;
 
   constructor(config: DockerRuntimeConfig) {
     super();
     this.repositoryName = config.repositoryName;
     this.registryUrl = config.registryUrl;
+    this.backendUrl = config.backendUrl;
   }
 
   private getImageUri(imageDigest: string): string {
@@ -96,6 +99,7 @@ export class DockerRuntime extends BaseRuntime {
     const eventPayload = {
       type: 'invoke_trigger',
       userCode,
+      backendUrl: this.backendUrl,
       ...payload,
     };
 

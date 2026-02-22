@@ -40,9 +40,11 @@ export function createRuntime(config: RuntimeFactoryConfig = {}): Runtime {
 
   switch (runtimeType) {
     case 'docker': {
+      const backendUrl = config.backendUrl ?? settings.general.PUBLIC_API_URL ?? settings.general.BACKEND_URL;
       const dockerConfig: DockerRuntimeConfig = {
         repositoryName: config.repositoryName ?? settings.runtime.REGISTRY_REPOSITORY_NAME,
         registryUrl: config.registryUrl ?? settings.runtime.REGISTRY_URL_RUNTIME ?? '',
+        backendUrl,
       };
       return new DockerRuntime(dockerConfig);
     }

@@ -18,6 +18,7 @@ import { decryptSecret } from '~/server/utils/encryption';
 import {
   updateExecutionStarted,
   updateExecutionNoDeployment,
+  updateExecutionFailed,
 } from '~/server/services/execution-service';
 import {
   getRuntime,
@@ -438,18 +439,20 @@ export async function executeTrigger(
 
     await getRuntime().invokeTrigger(triggerId, runtimeConfig, userCode, runtimePayload);
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Runtime invocation failed';
     logger.error('Runtime invocation failed', {
       triggerId,
       workflowId: workflow.id,
       executionId,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMsg,
     });
+    await updateExecutionFailed(executionId, errorMsg);
     return {
       triggerId,
       workflowId: workflow.id,
       executionId,
       status: 'error',
-      error: error instanceof Error ? error.message : 'Runtime invocation failed',
+      error: errorMsg,
     };
   }
 

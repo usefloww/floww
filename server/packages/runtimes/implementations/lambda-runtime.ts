@@ -113,6 +113,7 @@ export class LambdaRuntime extends BaseRuntime {
     const eventPayload = {
       type: 'invoke_trigger',
       userCode,
+      backendUrl: this.backendUrl,
       ...payload,
     };
 

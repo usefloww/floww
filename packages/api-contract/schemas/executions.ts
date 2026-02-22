@@ -5,14 +5,15 @@ import { z } from 'zod';
 // ============================================================================
 
 export const completeExecutionSchema = z.object({
-  status: z.enum(['completed', 'failed']),
+  status: z.enum(['completed', 'failed']).optional(),
   logs: z.array(z.object({
     timestamp: z.string(),
     level: z.string(),
     message: z.string(),
   })).optional(),
   result: z.unknown().optional(),
-  error: z.string().optional(),
+  error: z.union([z.string(), z.object({ message: z.string() })]).optional(),
+  duration_ms: z.number().optional(),
 });
 
 // ============================================================================

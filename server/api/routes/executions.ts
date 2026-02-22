@@ -128,18 +128,27 @@ post('/executions/:executionId/complete', async ({ params, request }) => {
   const parsed = await parseBody(request, completeExecutionSchema);
   if ('error' in parsed) return parsed.error;
 
-  const { status, logs, error } = parsed.data;
+  const { status: rawStatus, logs, error: rawError, duration_ms } = parsed.data;
+
+  // Normalize error to a string
+  const errorMessage = rawError
+    ? typeof rawError === 'string' ? rawError : rawError.message
+    : undefined;
+
+  // Infer status when not provided: error present → failed, otherwise → completed
+  const status = rawStatus ?? (errorMessage ? 'failed' : 'completed');
 
   // Update execution based on status
   if (status === 'completed') {
     await executionService.updateExecutionCompleted(params.executionId, {
       logs: logs ?? [],
+      durationMs: duration_ms,
     });
   } else if (status === 'failed') {
     await executionService.updateExecutionFailed(
       params.executionId,
-      error ?? 'Unknown error',
-      { logs: logs ?? [] }
+      errorMessage ?? 'Unknown error',
+      { logs: logs ?? [], durationMs: duration_ms }
     );
   }
 
