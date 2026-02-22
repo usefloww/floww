@@ -54,6 +54,11 @@
       "types": "./dist/codeExecution/index.d.ts",
       "import": "./dist/codeExecution/index.js",
       "require": "./dist/codeExecution/index.cjs"
+    },
+    "./policies": {
+      "types": "./dist/policies/index.d.ts",
+      "import": "./dist/policies/index.js",
+      "require": "./dist/policies/index.cjs"
     }
   },
   "files": [

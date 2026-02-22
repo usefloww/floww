@@ -100,4 +100,13 @@ export default defineConfig([
     clean: false,
     tsconfig: './tsconfig.json',
   },
+  // Policies module build
+  {
+    entry: ['policies/index.ts'],
+    format: ['cjs', 'esm'],
+    dts: true,
+    outDir: 'dist/policies',
+    clean: false,
+    tsconfig: './tsconfig.json',
+  },
 ]);

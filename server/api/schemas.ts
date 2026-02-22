@@ -68,6 +68,13 @@ export { centrifugoConnectSchema, centrifugoSubscribeSchema } from '@floww/api-c
 // Secret schemas
 export { createSecretSchema } from '@floww/api-contract';
 
+// Policy schemas
+export {
+  policyRuleSchema,
+  policyRulesArraySchema,
+  evaluatePolicySchema,
+} from '@floww/api-contract';
+
 // Type exports
 export type {
   CreateOrganizationInput,
@@ -87,4 +94,7 @@ export type {
   ExecuteTriggerInput,
   AuthConfigResponse,
   BackendConfigResponse,
+  PolicyRule as PolicyRuleType,
+  PolicyRulesArray,
+  EvaluatePolicyInput,
 } from '@floww/api-contract';

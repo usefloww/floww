@@ -43,4 +43,5 @@ import './routes/provider-types';
 import './routes/dev';
 import './routes/docker-proxy';
 import './routes/workflow-deployments';
+import './routes/policy-rules';
 import './routes/admin';

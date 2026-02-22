@@ -21,3 +21,4 @@ export * from './schemas/subscriptions';
 export * from './schemas/auth';
 export * from './schemas/runtimes';
 export * from './schemas/kv-store';
+export * from './schemas/policies';

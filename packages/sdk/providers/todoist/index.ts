@@ -149,6 +149,7 @@ export class Todoist extends BaseProvider {
   constructor(config?: TodoistConfig | string) {
     super("todoist", config);
     this.actions = new TodoistActions(() => this.getApi());
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   private getApi(): TodoistApi {

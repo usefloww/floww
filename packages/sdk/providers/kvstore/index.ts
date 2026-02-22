@@ -231,6 +231,7 @@ export class KVStore extends BaseProvider {
 
   constructor(config?: KVStoreConfig | string) {
     super("kvstore", config);
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   /**

@@ -24,6 +24,8 @@ import { providers } from '~/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { decryptSecret } from '~/server/utils/encryption';
 import { logger } from '~/server/utils/logger';
+import { buildRuleChain } from '~/server/services/policy-service';
+import { evaluateRuleChain } from 'floww/policies';
 
 // Schema for creating a deployment
 const createWorkflowDeploymentSchema = z.object({
@@ -265,6 +267,37 @@ post('/workflow-deployments', async (ctx) => {
       error: validation.errorMessage,
     });
     return errorResponse(`Deployment validation failed: ${validation.errorMessage}`, 400);
+  }
+
+  // Validate policy rules: check that each provider isn't fully blocked
+  if (providerMappings && Object.keys(providerMappings).length > 0) {
+    for (const [providerType, aliasMap] of Object.entries(providerMappings)) {
+      for (const [codeAlias, providerId] of Object.entries(aliasMap)) {
+        try {
+          const chain = await buildRuleChain(workflowId, providerId);
+          if (chain.rules.length > 0) {
+            // Test with a wildcard action to see if the provider has a catch-all DENY
+            const result = evaluateRuleChain(chain, '__policy_check__', {});
+            if (result.decision === 'DENIED') {
+              // Check if there are any ALLOW rules in the chain (grant or default)
+              const hasAllowRules = chain.rules.some(r => r.effect === 'ALLOW');
+              if (!hasAllowRules) {
+                return errorResponse(
+                  `Policy violation: provider ${providerType}:${codeAlias} denies all actions. ` +
+                  `Add ALLOW rules to the grant or provider defaults to permit specific actions.`,
+                  403
+                );
+              }
+            }
+          }
+        } catch (error) {
+          logger.warn('Policy validation failed for provider, skipping', {
+            providerType, codeAlias, providerId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
   }
 
   // Create the deployment (with provider mappings if available)

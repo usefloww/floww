@@ -22,6 +22,7 @@ export class Secret<T extends ZodRawShape> extends BaseProvider {
     super(name, credential);
     this.schema = schema;
     Secret.pendingSchema = undefined;
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   protected override initialize(): void {

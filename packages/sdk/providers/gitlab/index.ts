@@ -134,6 +134,7 @@ export type GitLabMergeRequestTriggerArgs = {
 export class Gitlab extends BaseProvider {
   constructor(config?: GitlabConfig | string) {
     super("gitlab", config);
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   actions = {};

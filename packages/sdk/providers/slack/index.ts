@@ -196,6 +196,7 @@ export class Slack extends BaseProvider {
   constructor(config?: SlackConfig | string) {
     super("slack", config);
     this.actions = new SlackActions(() => this.getApi());
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   private getApi(): SlackApi {

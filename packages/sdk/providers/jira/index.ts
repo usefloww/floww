@@ -198,6 +198,7 @@ export class Jira extends BaseProvider {
   constructor(config?: JiraConfig | string) {
     super("jira", config);
     this.actions = new JiraActions(() => this.getApi());
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   private getApi(): JiraApi {

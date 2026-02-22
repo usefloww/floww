@@ -9,6 +9,7 @@ type TrackedProvider = {
 const _usedProviders = new Map<string, TrackedProvider>();
 const _registeredTriggers = new Set<any>();
 const _providerConfigs: Map<string, Record<string, any>> = new Map();
+const _policyRules: Map<string, any> = new Map();
 
 export type ProviderMetadata = {
   type: string;
@@ -63,4 +64,19 @@ export function clearRegisteredTriggers() {
 
 export function clearUsedProviders() {
   _usedProviders.clear();
+}
+
+export function setPolicyRules(rules: Record<string, any>): void {
+  _policyRules.clear();
+  for (const [key, chain] of Object.entries(rules)) {
+    _policyRules.set(key, chain);
+  }
+}
+
+export function getPolicyRules(
+  provider: string,
+  alias: string
+): any | undefined {
+  const key = `${provider}:${alias}`;
+  return _policyRules.get(key);
 }

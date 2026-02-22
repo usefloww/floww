@@ -311,6 +311,7 @@ export class Discord extends BaseProvider {
   constructor(config?: DiscordConfig | string) {
     super("discord", config);
     this.actions = new DiscordActions(() => this.getApi());
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   private getApi(): DiscordApi {

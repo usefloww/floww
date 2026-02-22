@@ -12,6 +12,7 @@ import { registerTrigger } from "../../userCode/providers";
 export class Builtin extends BaseProvider {
   constructor(config?: any) {
     super("builtin", config);
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   actions = {};

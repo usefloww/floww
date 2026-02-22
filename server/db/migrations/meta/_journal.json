@@ -15,6 +15,13 @@
       "when": 1771081512723,
       "tag": "0001_moaning_lifeguard",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771774091861,
+      "tag": "0002_dashing_leader",
+      "breakpoints": true
     }
   ]
 }

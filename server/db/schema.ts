@@ -366,6 +366,7 @@ export const providers = pgTable('providers', {
   type: text('type').notNull(),
   alias: text('alias').notNull(),
   encryptedConfig: text('encrypted_config').notNull(),
+  defaultPolicyRules: jsonb('default_policy_rules'),
 });
 
 // Triggers table
@@ -577,6 +578,7 @@ export const providerAccess = pgTable(
     principleType: principleTypeEnum('principle_type').notNull(),
     principleId: uuid('principle_id').notNull(),
     role: accessRoleEnum('role').notNull(),
+    policyRules: jsonb('policy_rules'),
   },
   (table) => [
     uniqueIndex('uq_access_principal_resource').on(

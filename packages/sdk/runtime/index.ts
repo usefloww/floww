@@ -16,7 +16,8 @@ import { LogCapture, StructuredLogEntry } from "./logCapture";
 function createWrappedProject(
   files: Record<string, string>,
   entrypoint: string,
-  providerConfigs: Record<string, any> = {}
+  providerConfigs: Record<string, any> = {},
+  policyRules: Record<string, any> = {}
 ) {
   const [fileAndExport] = entrypoint.includes(".")
     ? entrypoint.split(".", 2)
@@ -28,7 +29,8 @@ function createWrappedProject(
             getRegisteredTriggers,
             clearRegisteredTriggers,
             clearUsedProviders,
-            setProviderConfigs
+            setProviderConfigs,
+            setPolicyRules
         } = require('floww');
 
         clearRegisteredTriggers();
@@ -36,6 +38,9 @@ function createWrappedProject(
 
         const __providerConfigs__ = ${JSON.stringify(providerConfigs)};
         setProviderConfigs(__providerConfigs__);
+
+        const __policyRules__ = ${JSON.stringify(policyRules)};
+        setPolicyRules(__policyRules__);
 
         const originalModule = require('./${fileAndExport.replace(".ts", "")}');
 
@@ -166,6 +171,10 @@ export interface InvokeTriggerEvent extends BaseEvent {
   // Decrypted provider configs injected into user code execution context
   // Format: "providerType:alias" -> config object
   providerConfigs?: Record<string, any>;
+
+  // Policy rule chains for provider action enforcement
+  // Format: "providerType:alias" -> { rules: [...] }
+  policyRules?: Record<string, any>;
 }
 
 /**
@@ -265,7 +274,8 @@ export async function handleGetDefinitions(
     const wrappedProject = createWrappedProject(
       files,
       entrypoint,
-      providerConfigs
+      providerConfigs,
+      {} // No policy rules needed for definition extraction
     );
 
     // Execute wrapped project
@@ -355,11 +365,15 @@ export async function invokeTrigger(
     // Backend decrypts and sends provider credentials for this namespace
     const providerConfigs = event.providerConfigs || {};
 
+    // Extract policy rules (pre-computed rule chains from backend)
+    const policyRules = event.policyRules || {};
+
     // Create wrapped project with auto-registration support
     const wrappedProject = createWrappedProject(
       files,
       entrypoint,
-      providerConfigs
+      providerConfigs,
+      policyRules
     );
 
     // Execute wrapped project

@@ -682,6 +682,7 @@ export class GitHub extends BaseProvider {
   constructor(config?: GitHubConfig | string) {
     super("github", config);
     this.actions = new GitHubActions(() => this.getApi());
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   private getApi(): GitHubApi {

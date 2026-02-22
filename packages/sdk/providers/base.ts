@@ -1,5 +1,7 @@
 import { Provider, SecretDefinition, Trigger } from "../common";
-import { getProviderConfig, trackProviderUsage } from "../userCode/providers";
+import { getProviderConfig, getPolicyRules, trackProviderUsage } from "../userCode/providers";
+import { evaluateRuleChain, PolicyViolationError } from "../policies";
+import type { PolicyRuleChain } from "../policies";
 import type { ZodType } from "zod";
 
 // ============================================================================
@@ -253,6 +255,49 @@ export abstract class BaseProvider implements Provider {
       // Backend config should not override explicit config passed to constructor
       this.config = { ...backendConfig, ...this.config };
     }
+  }
+
+  /**
+   * Wrap the actions object with a Proxy that enforces policy rules.
+   * Intercepts function calls on actions, evaluates the pre-serialized
+   * rule chain, and throws PolicyViolationError if the action is denied.
+   *
+   * Call this in the subclass constructor after setting `this.actions`.
+   */
+  protected wrapActionsWithPolicyCheck<T extends Record<string, any>>(actions: T): T {
+    const provider = this;
+    return new Proxy(actions, {
+      get(target, prop, receiver) {
+        const original = Reflect.get(target, prop, receiver);
+        if (typeof original !== 'function') return original;
+
+        const fn = original as Function;
+        return async function (this: any, ...args: any[]) {
+          const actionName = String(prop);
+          const parameters = args[0] ?? {};
+
+          // Get pre-serialized rule chain for this provider
+          const chain = getPolicyRules(
+            provider.providerType,
+            provider.credentialName
+          ) as PolicyRuleChain | undefined;
+
+          if (chain && chain.rules && chain.rules.length > 0) {
+            const result = evaluateRuleChain(chain, actionName, parameters);
+
+            if (result.decision === 'DENIED') {
+              throw new PolicyViolationError(
+                `Action '${actionName}' on ${provider.providerType}:${provider.credentialName} denied by policy: ${result.reason}`,
+                provider.providerType,
+                actionName
+              );
+            }
+          }
+
+          return fn.apply(this, args);
+        };
+      },
+    }) as T;
   }
 
   configure(secrets: Record<string, string>): void {

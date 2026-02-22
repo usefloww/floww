@@ -97,6 +97,7 @@ export type GoogleCalendarOnEventUpdatedArgs = {
 export class GoogleCalendar extends BaseProvider {
   constructor(config?: GoogleCalendarConfig | string) {
     super("google_calendar", config);
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   triggers = {

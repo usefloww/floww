@@ -27,6 +27,10 @@ import {
 } from '~/server/packages/runtimes';
 import { logger } from '~/server/utils/logger';
 import { settings } from '~/server/settings';
+import {
+  buildRuleChainsForDeployment,
+  buildRuleChainsForNamespace,
+} from '~/server/services/policy-service';
 
 export interface TriggerPayload {
   trigger: {
@@ -42,6 +46,7 @@ export interface TriggerPayload {
   authToken: string;
   executionId: string;
   providerConfigs: Record<string, Record<string, unknown>>;
+  policyRules?: Record<string, unknown>;
 }
 
 export interface WebhookEventData {
@@ -78,10 +83,11 @@ export function buildTriggerPayload(params: {
   providerConfigs: Record<string, Record<string, unknown>>;
   authToken: string;
   executionId: string;
+  policyRules?: Record<string, unknown>;
 }): TriggerPayload {
   const backendUrl = settings.general.PUBLIC_API_URL ?? 'http://localhost:3000';
 
-  return {
+  const payload: TriggerPayload = {
     trigger: {
       provider: {
         type: params.providerType,
@@ -96,6 +102,12 @@ export function buildTriggerPayload(params: {
     executionId: params.executionId,
     providerConfigs: params.providerConfigs,
   };
+
+  if (params.policyRules && Object.keys(params.policyRules).length > 0) {
+    payload.policyRules = params.policyRules;
+  }
+
+  return payload;
 }
 
 /**
@@ -344,6 +356,19 @@ export async function executeTrigger(
     ? resolveCodeAlias(deploymentMappings, provider.type, provider.id) ?? provider.alias
     : provider.alias;
 
+  // Build policy rule chains for all providers
+  let policyRules: Record<string, unknown> = {};
+  try {
+    policyRules = hasMapping
+      ? await buildRuleChainsForDeployment(workflow.id, deploymentMappings)
+      : await buildRuleChainsForNamespace(workflow.id, workflow.namespaceId);
+  } catch (error) {
+    logger.warn('Failed to build policy rule chains, continuing without policy enforcement', {
+      workflowId: workflow.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   // Build runtime payload
   const triggerPayload = buildTriggerPayload({
     providerType: provider.type,
@@ -354,6 +379,7 @@ export async function executeTrigger(
     providerConfigs,
     authToken,
     executionId,
+    policyRules,
   });
 
   // Get runtime config
@@ -397,6 +423,7 @@ export async function executeTrigger(
     authToken: triggerPayload.authToken,
     executionId: triggerPayload.executionId,
     providerConfigs: triggerPayload.providerConfigs,
+    policyRules: triggerPayload.policyRules,
   };
 
   // Invoke the runtime

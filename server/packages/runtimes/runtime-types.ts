@@ -33,6 +33,7 @@ export interface RuntimePayload {
   authToken: string;
   executionId: string;
   providerConfigs: Record<string, Record<string, unknown>>;
+  policyRules?: Record<string, unknown>;
 }
 
 export interface UserCode {

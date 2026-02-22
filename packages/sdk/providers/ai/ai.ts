@@ -43,6 +43,7 @@ export class AI extends BaseAIProvider {
 
   constructor(config?: AIConfig | string) {
     super("ai", config);
+    this.actions = this.wrapActionsWithPolicyCheck(this.actions);
   }
 
   /**
