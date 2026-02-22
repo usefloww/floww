@@ -11,15 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as SetupRouteImport } from './routes/setup'
-import { Route as ProvidersRouteImport } from './routes/providers'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkflowsIndexRouteImport } from './routes/workflows/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as ProvidersIndexRouteImport } from './routes/providers/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as ProvidersProviderIdRouteImport } from './routes/providers/$providerId'
 import { Route as AdminResourceIndexRouteImport } from './routes/admin/$resource/index'
 import { Route as WorkflowsWorkflowIdDeploymentsRouteImport } from './routes/workflows/$workflowId.deployments'
 import { Route as AdminResourceNewRouteImport } from './routes/admin/$resource/new'
@@ -36,11 +37,6 @@ const UpgradeRoute = UpgradeRouteImport.update({
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProvidersRoute = ProvidersRouteImport.update({
-  id: '/providers',
-  path: '/providers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -73,6 +69,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProvidersIndexRoute = ProvidersIndexRouteImport.update({
+  id: '/providers/',
+  path: '/providers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProfileIndexRoute = ProfileIndexRouteImport.update({
   id: '/profile/',
   path: '/profile/',
@@ -82,6 +83,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRouteRoute,
+} as any)
+const ProvidersProviderIdRoute = ProvidersProviderIdRouteImport.update({
+  id: '/providers/$providerId',
+  path: '/providers/$providerId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminResourceIndexRoute = AdminResourceIndexRouteImport.update({
   id: '/$resource/',
@@ -129,11 +135,12 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
-  '/providers': typeof ProvidersRoute
   '/setup': typeof SetupRoute
   '/upgrade': typeof UpgradeRoute
+  '/providers/$providerId': typeof ProvidersProviderIdRoute
   '/admin/': typeof AdminIndexRoute
   '/profile': typeof ProfileIndexRoute
+  '/providers': typeof ProvidersIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/workflows': typeof WorkflowsIndexRoute
   '/admin/$resource/new': typeof AdminResourceNewRoute
@@ -148,11 +155,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
-  '/providers': typeof ProvidersRoute
   '/setup': typeof SetupRoute
   '/upgrade': typeof UpgradeRoute
+  '/providers/$providerId': typeof ProvidersProviderIdRoute
   '/admin': typeof AdminIndexRoute
   '/profile': typeof ProfileIndexRoute
+  '/providers': typeof ProvidersIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/workflows': typeof WorkflowsIndexRoute
   '/admin/$resource/new': typeof AdminResourceNewRoute
@@ -169,11 +177,12 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
-  '/providers': typeof ProvidersRoute
   '/setup': typeof SetupRoute
   '/upgrade': typeof UpgradeRoute
+  '/providers/$providerId': typeof ProvidersProviderIdRoute
   '/admin/': typeof AdminIndexRoute
   '/profile/': typeof ProfileIndexRoute
+  '/providers/': typeof ProvidersIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/workflows/': typeof WorkflowsIndexRoute
   '/admin/$resource/new': typeof AdminResourceNewRoute
@@ -191,11 +200,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/checkout'
     | '/login'
-    | '/providers'
     | '/setup'
     | '/upgrade'
+    | '/providers/$providerId'
     | '/admin/'
     | '/profile'
+    | '/providers'
     | '/settings'
     | '/workflows'
     | '/admin/$resource/new'
@@ -210,11 +220,12 @@ export interface FileRouteTypes {
     | '/'
     | '/checkout'
     | '/login'
-    | '/providers'
     | '/setup'
     | '/upgrade'
+    | '/providers/$providerId'
     | '/admin'
     | '/profile'
+    | '/providers'
     | '/settings'
     | '/workflows'
     | '/admin/$resource/new'
@@ -230,11 +241,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/checkout'
     | '/login'
-    | '/providers'
     | '/setup'
     | '/upgrade'
+    | '/providers/$providerId'
     | '/admin/'
     | '/profile/'
+    | '/providers/'
     | '/settings/'
     | '/workflows/'
     | '/admin/$resource/new'
@@ -251,10 +263,11 @@ export interface RootRouteChildren {
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
   LoginRoute: typeof LoginRoute
-  ProvidersRoute: typeof ProvidersRoute
   SetupRoute: typeof SetupRoute
   UpgradeRoute: typeof UpgradeRoute
+  ProvidersProviderIdRoute: typeof ProvidersProviderIdRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
+  ProvidersIndexRoute: typeof ProvidersIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   WorkflowsIndexRoute: typeof WorkflowsIndexRoute
   WorkflowsWorkflowIdDeploymentsRoute: typeof WorkflowsWorkflowIdDeploymentsRouteWithChildren
@@ -275,13 +288,6 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/providers': {
-      id: '/providers'
-      path: '/providers'
-      fullPath: '/providers'
-      preLoaderRoute: typeof ProvidersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -326,6 +332,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/providers/': {
+      id: '/providers/'
+      path: '/providers'
+      fullPath: '/providers'
+      preLoaderRoute: typeof ProvidersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/profile/': {
       id: '/profile/'
       path: '/profile'
@@ -339,6 +352,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRouteRoute
+    }
+    '/providers/$providerId': {
+      id: '/providers/$providerId'
+      path: '/providers/$providerId'
+      fullPath: '/providers/$providerId'
+      preLoaderRoute: typeof ProvidersProviderIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin/$resource/': {
       id: '/admin/$resource/'
@@ -432,10 +452,11 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRouteRoute: AdminRouteRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
   LoginRoute: LoginRoute,
-  ProvidersRoute: ProvidersRoute,
   SetupRoute: SetupRoute,
   UpgradeRoute: UpgradeRoute,
+  ProvidersProviderIdRoute: ProvidersProviderIdRoute,
   ProfileIndexRoute: ProfileIndexRoute,
+  ProvidersIndexRoute: ProvidersIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   WorkflowsIndexRoute: WorkflowsIndexRoute,
   WorkflowsWorkflowIdDeploymentsRoute:

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNamespaceStore } from "@/stores/namespaceStore";
@@ -6,7 +6,7 @@ import { handleApiError } from "@/lib/api";
 import { Provider } from "@/types/api";
 import { getProviders } from "@/lib/server/providers";
 import { Loader } from "@/components/Loader";
-import { Search, Building2, CheckCircle, XCircle, Clock, MoreVertical, Settings, Trash2, Users } from "lucide-react";
+import { Search, Building2, CheckCircle, XCircle, Clock, MoreVertical, Settings, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ProviderConfigModal } from "@/components/ProviderConfigModal";
 import { DeleteProviderDialog } from "@/components/DeleteProviderDialog";
-import { ProviderAccessManagement } from "@/components/ProviderAccessManagement";
 import {
   Table,
   TableBody,
@@ -53,7 +52,7 @@ const getProviderLogoUrl = (type: string): string | null => {
   return `https://cdn.simpleicons.org/${iconName}`;
 };
 
-export const Route = createFileRoute("/providers")({
+export const Route = createFileRoute("/providers/")({
   component: ProvidersPage,
 });
 
@@ -63,7 +62,6 @@ function ProvidersPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [accessModalOpen, setAccessModalOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
 
   // Use TanStack Query to fetch providers
@@ -93,18 +91,6 @@ function ProvidersPage() {
   const handleDelete = (provider: Provider) => {
     setSelectedProvider(provider);
     setDeleteDialogOpen(true);
-  };
-
-  const handleManageAccess = (provider: Provider) => {
-    setSelectedProvider(provider);
-    setAccessModalOpen(true);
-  };
-
-  const handleAccessModalClose = (open: boolean) => {
-    setAccessModalOpen(open);
-    if (!open) {
-      setSelectedProvider(null);
-    }
   };
 
   const handleCreateClick = () => {
@@ -195,7 +181,6 @@ function ProvidersPage() {
                     provider={provider}
                     onConfigure={() => handleConfigure(provider)}
                     onDelete={() => handleDelete(provider)}
-                    onManageAccess={() => handleManageAccess(provider)}
                   />
                 ))}
               </TableBody>
@@ -224,15 +209,6 @@ function ProvidersPage() {
             provider={selectedProvider}
             namespaceId={currentNamespace.id}
           />
-          {selectedProvider && currentNamespace.organization && (
-            <ProviderAccessManagement
-              open={accessModalOpen}
-              onOpenChange={handleAccessModalClose}
-              providerId={selectedProvider.id}
-              providerName={selectedProvider.alias || selectedProvider.type}
-              organizationId={currentNamespace.organization.id}
-            />
-          )}
         </>
       )}
     </div>
@@ -243,10 +219,9 @@ interface ProviderRowProps {
   provider: Provider;
   onConfigure: () => void;
   onDelete: () => void;
-  onManageAccess: () => void;
 }
 
-function ProviderRow({ provider, onConfigure, onDelete, onManageAccess }: ProviderRowProps) {
+function ProviderRow({ provider, onConfigure, onDelete }: ProviderRowProps) {
   const providerName = provider.alias || provider.name || 'Unnamed Provider';
   const formattedDate = provider.createdAt 
     ? new Date(provider.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
@@ -310,7 +285,14 @@ function ProviderRow({ provider, onConfigure, onDelete, onManageAccess }: Provid
 
       {/* Name */}
       <TableCell>
-        <span className="font-medium text-foreground">{providerName}</span>
+        <Link
+          to="/providers/$providerId"
+          params={{ providerId: provider.id }}
+          search={{ tab: "policy" }}
+          className="font-medium text-foreground hover:text-primary hover:underline"
+        >
+          {providerName}
+        </Link>
       </TableCell>
 
       {/* Type */}
@@ -360,15 +342,6 @@ function ProviderRow({ provider, onConfigure, onDelete, onManageAccess }: Provid
             >
               <Settings className="h-4 w-4 mr-2" />
               Configure
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                setDropdownOpen(false);
-                onManageAccess();
-              }}
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Manage Access
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {

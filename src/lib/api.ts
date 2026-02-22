@@ -1,4 +1,4 @@
-import { ProviderType, WorkflowUpdate } from "@/types/api";
+import { ProviderType, WorkflowUpdate, PolicyRule, EvaluatePolicyInput } from "@/types/api";
 
 export class ApiError extends Error {
   constructor(
@@ -237,6 +237,27 @@ export async function updateWorkflow(workflowId: string, data: WorkflowUpdate) {
 
 export async function deleteWorkflow(workflowId: string) {
   return api.delete<void>(`/workflows/${workflowId}`);
+}
+
+// Policy Rule API methods
+export async function getProviderDefaultRules(providerId: string): Promise<{ rules: PolicyRule[] }> {
+  return api.get<{ rules: PolicyRule[] }>(`/providers/${providerId}/default-rules`);
+}
+
+export async function setProviderDefaultRules(providerId: string, rules: PolicyRule[]): Promise<{ rules: PolicyRule[] }> {
+  return api.put<{ rules: PolicyRule[] }>(`/providers/${providerId}/default-rules`, rules);
+}
+
+export async function getGrantRules(grantId: string): Promise<{ rules: PolicyRule[] }> {
+  return api.get<{ rules: PolicyRule[] }>(`/provider-access/${grantId}/rules`);
+}
+
+export async function setGrantRules(grantId: string, rules: PolicyRule[]): Promise<{ rules: PolicyRule[] }> {
+  return api.put<{ rules: PolicyRule[] }>(`/provider-access/${grantId}/rules`, rules);
+}
+
+export async function evaluatePolicy(data: EvaluatePolicyInput): Promise<{ decision: string; matchedRule: PolicyRule | null; chainEvaluated: PolicyRule[] }> {
+  return api.post<{ decision: string; matchedRule: PolicyRule | null; chainEvaluated: PolicyRule[] }>('/policies/evaluate', data);
 }
 
 // OAuth API methods

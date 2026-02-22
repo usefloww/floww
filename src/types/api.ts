@@ -85,6 +85,13 @@ export type {
 } from '@floww/api-contract';
 export { AccessRole, PrincipleType, ResourceType } from '@floww/api-contract';
 
+// Policy types
+export type {
+  PolicyRule,
+  PolicyRulesArray,
+  EvaluatePolicyInput,
+} from '@floww/api-contract';
+
 // Error types
 export type { ApiErrorResponse } from '@floww/api-contract';
 

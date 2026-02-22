@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { handleApiError } from "@/lib/api";
+import { handleApiError, getGrantRules, setGrantRules } from "@/lib/api";
 import { AccessRole } from "@/types/api";
+import type { PolicyRule } from "@/types/api";
+import { PolicyRuleEditor } from "@/components/PolicyRuleEditor";
+import {
+  showSuccessNotification,
+  showErrorNotification,
+} from "@/stores/notificationStore";
 import {
   getProviderAccess,
   grantProviderAccess,
@@ -18,6 +24,7 @@ import {
   UserPlus,
   Trash2,
   ChevronDown,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,21 +48,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface ProviderAccessManagementProps {
+interface ProviderAccessContentProps {
   providerId: string;
-  providerName: string;
   organizationId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
 }
 
-export function ProviderAccessManagement({
+export function ProviderAccessContent({
   providerId,
-  providerName,
   organizationId,
-  open,
-  onOpenChange,
-}: ProviderAccessManagementProps) {
+}: ProviderAccessContentProps) {
   const queryClient = useQueryClient();
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
@@ -65,6 +66,7 @@ export function ProviderAccessManagement({
     null
   );
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [rulesGrantEntry, setRulesGrantEntry] = useState<ProviderAccessEntry | null>(null);
 
   // Fetch provider access list
   const {
@@ -77,7 +79,7 @@ export function ProviderAccessManagement({
       const data = await getProviderAccess({ data: { providerId } });
       return data.results || [];
     },
-    enabled: open,
+    enabled: true,
   });
 
   // Fetch organization members for the "add user" dropdown
@@ -87,7 +89,7 @@ export function ProviderAccessManagement({
       const data = await getOrganizationMembers({ data: { organizationId } });
       return data.results;
     },
-    enabled: open && showAddUserModal,
+    enabled: showAddUserModal,
   });
 
   // Grant access mutation
@@ -147,6 +149,31 @@ export function ProviderAccessManagement({
     },
     onError: (error) => {
       setRemoveError(handleApiError(error));
+    },
+  });
+
+  // Fetch grant rules when a grant is selected
+  const {
+    data: grantRulesData,
+    isLoading: grantRulesLoading,
+  } = useQuery({
+    queryKey: ["grant-rules", rulesGrantEntry?.id],
+    queryFn: () => getGrantRules(rulesGrantEntry!.id),
+    enabled: !!rulesGrantEntry,
+  });
+
+  const grantRules: PolicyRule[] = grantRulesData?.rules ?? [];
+
+  // Save grant rules mutation
+  const saveGrantRulesMutation = useMutation({
+    mutationFn: ({ grantId, rules }: { grantId: string; rules: PolicyRule[] }) =>
+      setGrantRules(grantId, rules),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["grant-rules", rulesGrantEntry?.id] });
+      showSuccessNotification("Grant rules updated");
+    },
+    onError: (err) => {
+      showErrorNotification("Failed to save grant rules", handleApiError(err));
     },
   });
 
@@ -219,156 +246,152 @@ export function ProviderAccessManagement({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Manage Access - {providerName}
-            </DialogTitle>
-            <DialogDescription>
-              Control which users can access this provider.
-            </DialogDescription>
-          </DialogHeader>
+      <Loader
+        isLoading={accessLoading}
+        loadingMessage="Loading access list..."
+      >
+        <div className="space-y-4">
+          {/* Header with Add User button */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              {accessList.length} user{accessList.length !== 1 ? "s" : ""}{" "}
+              with access
+            </span>
+            <Button size="sm" onClick={() => setShowAddUserModal(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add User
+            </Button>
+          </div>
 
-          <Loader
-            isLoading={accessLoading}
-            loadingMessage="Loading access list..."
-          >
-            <div className="space-y-4 pt-2">
-              {/* Header with Add User button */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  {accessList.length} user{accessList.length !== 1 ? "s" : ""}{" "}
-                  with access
-                </span>
-                <Button size="sm" onClick={() => setShowAddUserModal(true)}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Add User
-                </Button>
-              </div>
-
-              {/* Error message */}
-              {errorMessage && (
-                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
-                  {errorMessage}
-                </div>
-              )}
-
-              {/* Access list */}
-              {accessList.length === 0 ? (
-                <div className="text-center py-8">
-                  <Users className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <h3 className="mt-2 text-sm font-medium text-foreground">
-                    No users with access
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Add users to grant them access to this provider.
-                  </p>
-                </div>
-              ) : (
-                <div className="border border-border rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-border">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          User
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Role
-                        </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-card divide-y divide-border">
-                      {accessList.map((entry) => (
-                        <tr key={entry.id} className="hover:bg-muted/50">
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="flex-shrink-0 h-8 w-8">
-                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <span className="text-xs font-medium text-primary">
-                                    {getUserInitials(entry)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="ml-3">
-                                <div className="text-sm font-medium text-foreground">
-                                  {getUserDisplayName(entry)}
-                                </div>
-                                {entry.userEmail &&
-                                  entry.userFirstName &&
-                                  entry.userLastName && (
-                                    <div className="text-xs text-muted-foreground">
-                                      {entry.userEmail}
-                                    </div>
-                                  )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-                                  {getRoleIcon(entry.role)}
-                                  <span
-                                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getRoleColor(entry.role)}`}
-                                  >
-                                    {entry.role}
-                                  </span>
-                                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start">
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    updateRoleMutation.mutate({
-                                      userId: entry.userId,
-                                      role: AccessRole.OWNER,
-                                    })
-                                  }
-                                  disabled={entry.role === 'OWNER'}
-                                >
-                                  <Crown className="h-4 w-4 mr-2 text-yellow-600" />
-                                  Owner
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    updateRoleMutation.mutate({
-                                      userId: entry.userId,
-                                      role: AccessRole.USER,
-                                    })
-                                  }
-                                  disabled={entry.role === 'USER'}
-                                >
-                                  <User className="h-4 w-4 mr-2" />
-                                  User
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setUserToRemove(entry)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+          {/* Error message */}
+          {errorMessage && (
+            <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+              {errorMessage}
             </div>
-          </Loader>
-        </DialogContent>
-      </Dialog>
+          )}
+
+          {/* Access list */}
+          {accessList.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="mx-auto h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-2 text-sm font-medium text-foreground">
+                No users with access
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add users to grant them access to this provider.
+              </p>
+            </div>
+          ) : (
+            <div className="border border-border rounded-lg overflow-hidden">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      User
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Role
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-card divide-y divide-border">
+                  {accessList.map((entry) => (
+                    <tr key={entry.id} className="hover:bg-muted/50">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8">
+                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                              <span className="text-xs font-medium text-primary">
+                                {getUserInitials(entry)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="ml-3">
+                            <div className="text-sm font-medium text-foreground">
+                              {getUserDisplayName(entry)}
+                            </div>
+                            {entry.userEmail &&
+                              entry.userFirstName &&
+                              entry.userLastName && (
+                                <div className="text-xs text-muted-foreground">
+                                  {entry.userEmail}
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+                              {getRoleIcon(entry.role)}
+                              <span
+                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getRoleColor(entry.role)}`}
+                              >
+                                {entry.role}
+                              </span>
+                              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                updateRoleMutation.mutate({
+                                  userId: entry.userId,
+                                  role: AccessRole.OWNER,
+                                })
+                              }
+                              disabled={entry.role === 'OWNER'}
+                            >
+                              <Crown className="h-4 w-4 mr-2 text-yellow-600" />
+                              Owner
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                updateRoleMutation.mutate({
+                                  userId: entry.userId,
+                                  role: AccessRole.USER,
+                                })
+                              }
+                              disabled={entry.role === 'USER'}
+                            >
+                              <User className="h-4 w-4 mr-2" />
+                              User
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setRulesGrantEntry(entry)}
+                            title="Policy Rules"
+                          >
+                            <Shield className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setUserToRemove(entry)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Loader>
 
       {/* Add User Modal */}
       <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}>
@@ -502,9 +525,70 @@ export function ProviderAccessManagement({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Grant Policy Rules Dialog */}
+      <Dialog open={!!rulesGrantEntry} onOpenChange={() => setRulesGrantEntry(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Policy Rules - {rulesGrantEntry ? getUserDisplayName(rulesGrantEntry) : ""}
+            </DialogTitle>
+            <DialogDescription>
+              Configure policy rules for this user's access grant. These rules override the provider's default rules.
+            </DialogDescription>
+          </DialogHeader>
+          <Loader isLoading={grantRulesLoading} loadingMessage="Loading grant rules...">
+            <PolicyRuleEditor
+              rules={grantRules}
+              onSave={(rules) => {
+                if (rulesGrantEntry) {
+                  saveGrantRulesMutation.mutate({ grantId: rulesGrantEntry.id, rules });
+                }
+              }}
+              isSaving={saveGrantRulesMutation.isPending}
+            />
+          </Loader>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
 
+interface ProviderAccessManagementProps {
+  providerId: string;
+  providerName: string;
+  organizationId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
 
-
+export function ProviderAccessManagement({
+  providerId,
+  providerName,
+  organizationId,
+  open,
+  onOpenChange,
+}: ProviderAccessManagementProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Manage Access - {providerName}
+          </DialogTitle>
+          <DialogDescription>
+            Control which users can access this provider.
+          </DialogDescription>
+        </DialogHeader>
+        {open && (
+          <ProviderAccessContent
+            providerId={providerId}
+            organizationId={organizationId}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
