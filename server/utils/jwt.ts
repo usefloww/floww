@@ -111,6 +111,15 @@ export async function validatePasswordAuthToken(token: string): Promise<TokenUse
   }
 }
 
+function getTokenAlgorithm(token: string): string | null {
+  try {
+    const header = JSON.parse(atob(token.split('.')[0]));
+    return header.alg ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Validate a JWT token (auto-detects auth type)
  */
@@ -121,7 +130,12 @@ export async function validateToken(token: string): Promise<TokenUser> {
     return validatePasswordAuthToken(token);
   }
 
-  // Default to WorkOS/OIDC
+  // Route by algorithm: HS256 tokens are locally-issued (session cookies, device auth),
+  // RS256 tokens come from WorkOS/OIDC
+  const alg = getTokenAlgorithm(token);
+  if (alg === 'HS256') {
+    return validatePasswordAuthToken(token);
+  }
   return validateWorkOsToken(token);
 }
 
