@@ -12,6 +12,8 @@ import { getDb } from '~/server/db';
 import { users, apiKeys } from '~/server/db/schema';
 import { getJwtFromSessionCookie } from '~/server/utils/session';
 import { validateToken, type TokenUser } from '~/server/utils/jwt';
+import { getOrCreateUser } from '~/server/services/user';
+import { settings } from '~/server/settings';
 import crypto from 'crypto';
 import { logger } from '~/server/utils/logger';
 
@@ -85,6 +87,8 @@ async function getUserFromApiKey(apiKey: string): Promise<AuthenticatedUser | nu
  * For WorkOS/OIDC, tokenUser.id is the provider's user id (workos_user_id).
  * For password auth, tokenUser.id is the internal user id (users.id).
  */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function getUserFromToken(tokenUser: TokenUser): Promise<AuthenticatedUser | null> {
   const db = getDb();
 
@@ -96,7 +100,7 @@ async function getUserFromToken(tokenUser: TokenUser): Promise<AuthenticatedUser
     .limit(1);
 
   // Fall back to users.id (password auth tokens use sub = internal user id)
-  if (!user) {
+  if (!user && UUID_REGEX.test(tokenUser.id)) {
     [user] = await db
       .select()
       .from(users)
@@ -105,6 +109,16 @@ async function getUserFromToken(tokenUser: TokenUser): Promise<AuthenticatedUser
   }
 
   if (!user) {
+    // Auto-provision for WorkOS/OIDC on first login
+    if (settings.auth.AUTH_TYPE !== 'password' && tokenUser.id) {
+      return getOrCreateUser({
+        workosUserId: tokenUser.id,
+        email: tokenUser.email,
+        firstName: tokenUser.firstName,
+        lastName: tokenUser.lastName,
+        username: tokenUser.username,
+      });
+    }
     return null;
   }
 
