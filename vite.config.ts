@@ -41,6 +41,11 @@ export default defineConfig({
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
   },
+  server: {
+    // Required for Centrifugo in Docker to reach the dev server via host.docker.internal
+    host: '0.0.0.0',
+    allowedHosts: ['host.docker.internal'],
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

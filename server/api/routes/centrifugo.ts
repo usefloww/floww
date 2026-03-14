@@ -11,16 +11,19 @@ import { centrifugoConnectSchema, centrifugoSubscribeSchema } from '~/server/api
 import { hasWorkflowAccess, hasNamespaceAccess } from '~/server/services/access-service';
 import { getExecution } from '~/server/services/execution-service';
 
-// Generate connection token for Centrifugo
+// Centrifugo connect proxy — authenticates user and returns their ID
 post('/centrifugo/connect', async ({ user, request }) => {
   if (!user) return errorResponse('Unauthorized', 401);
 
   const parsed = await parseBody(request, centrifugoConnectSchema);
   if ('error' in parsed) return parsed.error;
 
-  const token = await centrifugoService.generateConnectionToken(user.id);
-
-  return json({ token });
+  return json({
+    result: {
+      user: user.id,
+      expire_at: Math.floor(Date.now() / 1000) + 3600,
+    },
+  });
 });
 
 // Generate subscription token for a channel
@@ -72,10 +75,12 @@ post('/centrifugo/subscribe', async ({ user, request }) => {
   }
 
   if (!hasAccess) {
-    return errorResponse('Access denied to channel', 403);
+    return json({ error: { code: 403, message: 'Access denied to channel' } });
   }
 
-  const token = await centrifugoService.generateSubscriptionToken(user.id, channel);
-
-  return json({ token });
+  return json({
+    result: {
+      expire_at: Math.floor(Date.now() / 1000) + 3600,
+    },
+  });
 });
