@@ -37,7 +37,30 @@ export function getContainerName(runtimeId: string): string {
   return `${CONTAINER_NAME_PREFIX}${runtimeId}`;
 }
 
-function getContainerUrl(containerName: string): string {
+// When running outside Docker (dev mode), we can't resolve container hostnames,
+// so we use published ports on localhost instead.
+function isRunningInDocker(): boolean {
+  return backendNetwork !== null && backendNetwork !== 'bridge';
+}
+
+async function getContainerUrl(containerName: string): Promise<string> {
+  if (isRunningInDocker()) {
+    return `http://${containerName}:8000`;
+  }
+
+  // Outside Docker: look up the published host port
+  const docker = getDockerClient();
+  try {
+    const container = docker.getContainer(containerName);
+    const info = await container.inspect();
+    const portBindings = info.NetworkSettings?.Ports?.['8000/tcp'];
+    if (portBindings && portBindings.length > 0) {
+      const hostPort = portBindings[0].HostPort;
+      return `http://localhost:${hostPort}`;
+    }
+  } catch {
+    // Fall through to default
+  }
   return `http://${containerName}:8000`;
 }
 
@@ -101,7 +124,7 @@ async function getContainerConfig(
 ): Promise<Docker.ContainerCreateOptions> {
   const networkMode = await getBackendNetwork();
 
-  return {
+  const config: Docker.ContainerCreateOptions = {
     Image: imageUri,
     Hostname: containerName,
     name: containerName,
@@ -110,17 +133,28 @@ async function getContainerConfig(
       [LABEL_LAST_USED]: new Date().toISOString(),
       [LABEL_IMAGE_URI]: imageUri,
     },
+    ExposedPorts: { '8000/tcp': {} },
     HostConfig: {
       NetworkMode: networkMode,
       Memory: 512 * 1024 * 1024, // 512 MB
       CpuQuota: 100000, // 100% of one CPU
     },
   };
+
+  // When backend runs outside Docker, publish port to host for reachability
+  if (networkMode === 'bridge') {
+    config.HostConfig!.PortBindings = {
+      '8000/tcp': [{ HostPort: '0' }],  // random available port
+    };
+  }
+
+  return config;
 }
 
 async function checkContainerHealth(containerName: string): Promise<boolean> {
   try {
-    const response = await fetch(`${getContainerUrl(containerName)}/health`, {
+    const url = await getContainerUrl(containerName);
+    const response = await fetch(`${url}/health`, {
       signal: AbortSignal.timeout(2000),
     });
     return response.status === 200;
@@ -131,10 +165,11 @@ async function checkContainerHealth(containerName: string): Promise<boolean> {
 
 async function waitForContainerReady(containerName: string, timeout = 30): Promise<void> {
   const startTime = Date.now();
+  const url = await getContainerUrl(containerName);
 
   while ((Date.now() - startTime) / 1000 < timeout) {
     try {
-      const response = await fetch(`${getContainerUrl(containerName)}/health`, {
+      const response = await fetch(`${url}/health`, {
         signal: AbortSignal.timeout(2000),
       });
       if (response.status === 200) {
@@ -206,8 +241,9 @@ export async function createContainer(runtimeId: string, imageUri: string): Prom
       const config = await getContainerConfig(runtimeId, imageUri, containerName);
       const container = await docker.createContainer(config);
       await container.start();
+      await waitForContainerReady(containerName);
 
-      logger.info('Container created and started', { containerName });
+      logger.info('Container created and ready', { containerName });
     } else {
       logger.error('Docker error while creating container', { runtimeId, error: error instanceof Error ? error.message : String(error) });
       throw error;
@@ -297,7 +333,7 @@ export async function sendWebhookToContainer(
   timeout = 60
 ): Promise<Record<string, unknown>> {
   const containerName = getContainerName(runtimeId);
-  const url = `${getContainerUrl(containerName)}/execute`;
+  const url = `${await getContainerUrl(containerName)}/execute`;
 
   logger.debug('Sending webhook to container', { containerName });
 

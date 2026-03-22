@@ -15,7 +15,7 @@ import { z } from 'zod';
 import { get, post, patch, del, json, errorResponse, parseBody } from '~/server/api/router';
 import { hasWorkflowAccess } from '~/server/services/access-service';
 import * as workflowService from '~/server/services/workflow-service';
-import { getDefaultRuntimeId, getOrCreateDefaultRuntimeForVersion } from '~/server/services/default-runtime';
+import { getDefaultRuntimeId, getOrCreateDefaultRuntimeForVersion, prepareDefaultRuntime } from '~/server/services/default-runtime';
 import * as runtimeService from '~/server/services/runtime-service';
 import { syncTriggers, type TriggerMetadata, type WebhookInfo } from '~/server/services/trigger-service';
 import { getRuntime } from '~/server/packages/runtimes';
@@ -216,16 +216,40 @@ post('/workflow-deployments', async (ctx) => {
   }
   if (!runtimeId) {
     runtimeId = (await getDefaultRuntimeId()) ?? undefined;
-    if (!runtimeId) {
-      return errorResponse('No runtime_id provided and no default runtime configured', 400);
-    }
-    logger.info('Using default runtime', { runtimeId });
   }
 
-  // Verify runtime exists and user has access
-  const runtime = await runtimeService.getRuntime(runtimeId);
+  // Verify runtime exists; if the stored default ID is stale, re-prepare
+  let runtime = runtimeId ? await runtimeService.getRuntime(runtimeId) : null;
   if (!runtime) {
-    return errorResponse('Runtime not found', 400);
+    await prepareDefaultRuntime();
+    runtimeId = (await getDefaultRuntimeId()) ?? undefined;
+    runtime = runtimeId ? await runtimeService.getRuntime(runtimeId) : null;
+  }
+  if (!runtime || !runtimeId) {
+    return errorResponse('No runtime_id provided and no default runtime configured', 400);
+  }
+
+  // Wait for runtime to be ready (Lambda deploys are async)
+  if (runtime.creationStatus !== 'COMPLETED') {
+    const waitRuntimeImpl = getRuntime();
+    const maxWait = 60_000;
+    const start = Date.now();
+    while (Date.now() - start < maxWait) {
+      const status = await waitRuntimeImpl.getRuntimeStatus(runtimeId);
+      if (status.status === 'COMPLETED') {
+        await runtimeService.updateRuntimeStatus(runtimeId, 'COMPLETED');
+        break;
+      }
+      if (status.status === 'FAILED') {
+        return errorResponse('Runtime creation failed', 500);
+      }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    // Re-fetch to get updated status
+    runtime = await runtimeService.getRuntime(runtimeId);
+    if (!runtime || runtime.creationStatus !== 'COMPLETED') {
+      return errorResponse('Runtime not ready after timeout', 500);
+    }
   }
 
   // Get provider configs: use ID-based mapping if available, fall back to namespace-wide lookup

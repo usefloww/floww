@@ -10,6 +10,7 @@
 !src/
 !server/
 !packages/
+!runtime-images/
 !index.html
 
 # Whitelist configuration files

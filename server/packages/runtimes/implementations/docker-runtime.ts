@@ -61,11 +61,11 @@ export class DockerRuntime extends BaseRuntime {
     await createContainer(config.runtimeId, imageUri);
 
     return {
-      status: 'IN_PROGRESS',
+      status: 'COMPLETED',
       newLogs: [
         {
           timestamp: new Date().toISOString(),
-          message: 'Container creation initiated',
+          message: 'Container created and ready',
           level: 'info',
         },
       ],
@@ -86,6 +86,20 @@ export class DockerRuntime extends BaseRuntime {
     };
   }
 
+  private async ensureContainerRunning(runtimeConfig: RuntimeConfig): Promise<void> {
+    try {
+      await startContainerIfStopped(runtimeConfig.runtimeId);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('does not exist')) {
+        this.log('Container missing, creating it', { runtimeId: runtimeConfig.runtimeId });
+        const imageUri = this.getImageUri(runtimeConfig.imageDigest);
+        await createContainer(runtimeConfig.runtimeId, imageUri);
+        return;
+      }
+      throw error;
+    }
+  }
+
   async invokeTrigger(
     triggerId: string,
     runtimeConfig: RuntimeConfig,
@@ -94,7 +108,7 @@ export class DockerRuntime extends BaseRuntime {
   ): Promise<void> {
     this.log('Invoking trigger', { triggerId, runtimeId: runtimeConfig.runtimeId });
 
-    await startContainerIfStopped(runtimeConfig.runtimeId);
+    await this.ensureContainerRunning(runtimeConfig);
 
     const eventPayload = {
       type: 'invoke_trigger',
@@ -113,7 +127,7 @@ export class DockerRuntime extends BaseRuntime {
   ): Promise<DefinitionsResult> {
     this.log('Getting definitions', { runtimeId: runtimeConfig.runtimeId });
 
-    await startContainerIfStopped(runtimeConfig.runtimeId);
+    await this.ensureContainerRunning(runtimeConfig);
 
     const eventPayload = {
       type: 'get_definitions',

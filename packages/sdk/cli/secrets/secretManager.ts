@@ -36,6 +36,21 @@ export class SecretManager {
   }
 
   /**
+   * List secrets matching the given filters
+   */
+  private async listSecrets(
+    provider?: string,
+    name?: string,
+  ): Promise<SecretResponse[]> {
+    let url = `/secrets?namespaceId=${encodeURIComponent(this.namespaceId)}`;
+    if (provider) url += `&provider=${encodeURIComponent(provider)}`;
+    if (name) url += `&name=${encodeURIComponent(name)}`;
+
+    const data = await this.apiClient.apiCall<{ results: SecretResponse[] }>(url);
+    return data.results ?? [];
+  }
+
+  /**
    * Get a specific secret value from the backend
    */
   async getSecret(
@@ -46,25 +61,19 @@ export class SecretManager {
     const secretName = `${credentialName}:${key}`;
 
     try {
-      // First, list secrets to find the matching one
-      const secrets = await this.apiClient.apiCall<SecretResponse[]>(
-        `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}&name=${encodeURIComponent(secretName)}`,
-      );
+      const secrets = await this.listSecrets(providerType, secretName);
 
-      if (!Array.isArray(secrets) || secrets.length === 0) {
+      if (secrets.length === 0) {
         return undefined;
       }
 
-      // Get the secret with its decrypted value
-      const secret = secrets[0];
       const secretWithValue =
         await this.apiClient.apiCall<SecretWithValueResponse>(
-          `/secrets/${secret.id}`,
+          `/secrets/${secrets[0].id}`,
         );
 
       return secretWithValue?.value;
     } catch (error) {
-      // 404 Not Found is okay - it just means no secrets exist yet
       if (error instanceof NotFoundError) {
         return undefined;
       }
@@ -80,27 +89,21 @@ export class SecretManager {
     credentialName: string,
   ): Promise<ProviderSecrets | undefined> {
     try {
-      // List all secrets for this provider
-      const allSecrets = await this.apiClient.apiCall<SecretResponse[]>(
-        `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}&name=${encodeURIComponent(credentialName)}`,
-      );
+      const allSecrets = await this.listSecrets(providerType, credentialName);
 
-      if (!Array.isArray(allSecrets) || allSecrets.length === 0) {
+      if (allSecrets.length === 0) {
         return undefined;
       }
 
-      // Get the secret with its decrypted value
-      const secret = allSecrets[0];
       const secretWithValue =
         await this.apiClient.apiCall<SecretWithValueResponse>(
-          `/secrets/${secret.id}`,
+          `/secrets/${allSecrets[0].id}`,
         );
 
       if (!secretWithValue?.value) {
         return undefined;
       }
 
-      // Parse JSON value
       try {
         return JSON.parse(secretWithValue.value);
       } catch (error) {
@@ -108,7 +111,6 @@ export class SecretManager {
         return undefined;
       }
     } catch (error) {
-      // 404 Not Found is okay - it just means no secrets exist yet
       if (error instanceof NotFoundError) {
         return undefined;
       }
@@ -127,46 +129,15 @@ export class SecretManager {
   ): Promise<void> {
     const secretName = `${credentialName}:${key}`;
 
-    try {
-      // Check if secret already exists
-      const existing = await this.apiClient.apiCall<SecretResponse[]>(
-        `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}&name=${encodeURIComponent(secretName)}`,
-      );
-
-      if (Array.isArray(existing) && existing.length > 0) {
-        // Update existing secret
-        await this.apiClient.apiCall(`/secrets/${existing[0].id}`, {
-          method: "PATCH",
-          body: { value },
-        });
-      } else {
-        // Create new secret
-        await this.apiClient.apiCall("/secrets/", {
-          method: "POST",
-          body: {
-            namespace_id: this.namespaceId,
-            name: secretName,
-            provider: providerType,
-            value,
-          },
-        });
-      }
-    } catch (error) {
-      // 404 Not Found means no secrets exist, so create new
-      if (error instanceof NotFoundError) {
-        await this.apiClient.apiCall("/secrets/", {
-          method: "POST",
-          body: {
-            namespace_id: this.namespaceId,
-            name: secretName,
-            provider: providerType,
-            value,
-          },
-        });
-      } else {
-        throw error;
-      }
-    }
+    await this.apiClient.apiCall("/secrets", {
+      method: "POST",
+      body: {
+        namespaceId: this.namespaceId,
+        name: secretName,
+        provider: providerType,
+        value,
+      },
+    });
   }
 
   /**
@@ -177,50 +148,17 @@ export class SecretManager {
     credentialName: string,
     secrets: ProviderSecrets,
   ): Promise<void> {
-    console.log(`[SecretManager] Storing secrets for ${providerType}:${credentialName}:`, secrets);
     const jsonValue = JSON.stringify(secrets);
-    console.log(`[SecretManager] JSON value:`, jsonValue);
 
-    try {
-      // Check if secret already exists
-      const existing = await this.apiClient.apiCall<SecretResponse[]>(
-        `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}&name=${encodeURIComponent(credentialName)}`,
-      );
-
-      if (Array.isArray(existing) && existing.length > 0) {
-        // Update existing secret
-        await this.apiClient.apiCall(`/secrets/${existing[0].id}`, {
-          method: "PATCH",
-          body: { value: jsonValue },
-        });
-      } else {
-        // Create new secret
-        await this.apiClient.apiCall("/secrets/", {
-          method: "POST",
-          body: {
-            namespace_id: this.namespaceId,
-            name: credentialName,
-            provider: providerType,
-            value: jsonValue,
-          },
-        });
-      }
-    } catch (error) {
-      // 404 Not Found means no secrets exist, so create new
-      if (error instanceof NotFoundError) {
-        await this.apiClient.apiCall("/secrets/", {
-          method: "POST",
-          body: {
-            namespace_id: this.namespaceId,
-            name: credentialName,
-            provider: providerType,
-            value: jsonValue,
-          },
-        });
-      } else {
-        throw error;
-      }
-    }
+    await this.apiClient.apiCall("/secrets", {
+      method: "POST",
+      body: {
+        namespaceId: this.namespaceId,
+        name: credentialName,
+        provider: providerType,
+        value: jsonValue,
+      },
+    });
   }
 
   /**
@@ -387,22 +325,14 @@ export class SecretManager {
     credentialName: string,
   ): Promise<void> {
     try {
-      // List all secrets for this provider and credential
-      const allSecrets = await this.apiClient.apiCall<SecretResponse[]>(
-        `/secrets/namespace/${this.namespaceId}?provider=${encodeURIComponent(providerType)}&name=${encodeURIComponent(credentialName)}`,
-      );
+      const allSecrets = await this.listSecrets(providerType, credentialName);
 
-      if (!Array.isArray(allSecrets) || allSecrets.length === 0) {
-        return;
+      for (const secret of allSecrets) {
+        await this.apiClient.apiCall(`/secrets/${secret.id}`, {
+          method: "DELETE",
+        });
       }
-
-      // Delete the secret
-      const secret = allSecrets[0];
-      await this.apiClient.apiCall(`/secrets/${secret.id}`, {
-        method: "DELETE",
-      });
     } catch (error) {
-      // 404 Not Found is okay - it just means no secrets exist
       if (error instanceof NotFoundError) {
         return;
       }
@@ -415,23 +345,14 @@ export class SecretManager {
    */
   async clearAllSecrets(): Promise<void> {
     try {
-      // List all secrets in the namespace
-      const allSecrets = await this.apiClient.apiCall<SecretResponse[]>(
-        `/secrets/namespace/${this.namespaceId}`,
-      );
+      const allSecrets = await this.listSecrets();
 
-      if (!Array.isArray(allSecrets) || allSecrets.length === 0) {
-        return;
-      }
-
-      // Delete each secret
       for (const secret of allSecrets) {
         await this.apiClient.apiCall(`/secrets/${secret.id}`, {
           method: "DELETE",
         });
       }
     } catch (error) {
-      // 404 Not Found is okay - it just means no secrets exist
       if (error instanceof NotFoundError) {
         return;
       }

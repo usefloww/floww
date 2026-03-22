@@ -92,7 +92,7 @@ function readSdkVersion(projectDir: string): string | null {
       packageJson.dependencies?.["@floww/sdk"] ??
       null;
 
-    if (!version || version === "*" || version === "latest") {
+    if (!version || version === "*" || version === "latest" || version.startsWith("link:") || version.startsWith("file:") || version.startsWith("workspace:")) {
       return null;
     }
 

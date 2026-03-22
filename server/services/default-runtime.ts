@@ -2,7 +2,7 @@
  * Default Runtime Service
  *
  * Manages the default runtime that's used when no custom runtime is specified.
- * Currently only supports Lambda runtime type.
+ * Supports Lambda, Docker, and Local runtime types.
  */
 
 import { eq } from 'drizzle-orm';
@@ -12,6 +12,7 @@ import { configurations, runtimes } from '~/server/db/schema';
 import { generateUlidUuid } from '~/server/utils/uuid';
 import { logger } from '~/server/utils/logger';
 import { settings } from '~/server/settings';
+import { getRuntime } from '~/server/packages/runtimes';
 
 const DEFAULT_RUNTIME_CONFIG_KEY = 'default_runtime_id';
 
@@ -81,18 +82,19 @@ export async function prepareDefaultRuntime(): Promise<void> {
     return;
   }
 
-  if (!defaultRuntimeImage) {
+  const DEFAULT_DOCKER_RUNTIME_IMAGE = 'ghcr.io/usefloww/docker-runtime:latest';
+
+  if (!defaultRuntimeImage && runtimeType !== 'docker') {
     logger.debug('No DEFAULT_RUNTIME_IMAGE configured, skipping default runtime setup');
     return;
   }
 
-  // Only Lambda is supported for default runtime (besides local)
-  if (runtimeType !== 'lambda') {
-    logger.debug('Default runtime only supported for Lambda, skipping', { runtimeType });
+  if (runtimeType !== 'lambda' && runtimeType !== 'docker') {
+    logger.debug('Default runtime auto-setup not supported for this runtime type, skipping', { runtimeType });
     return;
   }
 
-  const imageUri = defaultRuntimeImage;
+  const imageUri = defaultRuntimeImage || DEFAULT_DOCKER_RUNTIME_IMAGE;
   const configHash = generateConfigHashFromUri(imageUri);
 
   logger.info('Preparing default runtime', { imageUri, configHash });
@@ -110,24 +112,37 @@ export async function prepareDefaultRuntime(): Promise<void> {
     logger.info('Default runtime already exists', { runtimeId: existingRuntime.id, status: existingRuntime.creationStatus });
     await setDefaultRuntimeId(existingRuntime.id);
 
-    // If already completed, we're done
     if (existingRuntime.creationStatus === 'COMPLETED') {
       return;
     }
 
-    // If failed, mark as in progress for retry
-    if (existingRuntime.creationStatus === 'FAILED') {
-      logger.info('Retrying failed default runtime creation');
+    // Retry runtime creation for FAILED or IN_PROGRESS runtimes
+    try {
+      const runtimeImpl = getRuntime();
+      const result = await runtimeImpl.createRuntime({
+        runtimeId: existingRuntime.id,
+        imageDigest: imageUri,
+      });
+
+      await db
+        .update(runtimes)
+        .set({ creationStatus: result.status, creationLogs: [] })
+        .where(eq(runtimes.id, existingRuntime.id));
+      logger.info('Default runtime recovered', { runtimeId: existingRuntime.id, status: result.status });
+    } catch (error) {
+      logger.error('Failed to recover default runtime', {
+        runtimeId: existingRuntime.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
       await db
         .update(runtimes)
         .set({
-          creationStatus: 'IN_PROGRESS',
-          creationLogs: [],
+          creationStatus: 'FAILED',
+          creationLogs: [{ timestamp: new Date().toISOString(), message: String(error), level: 'error' }],
         })
         .where(eq(runtimes.id, existingRuntime.id));
     }
 
-    // Note: Actual Lambda creation should be triggered separately via the runtimes package
     return;
   }
 
@@ -144,12 +159,34 @@ export async function prepareDefaultRuntime(): Promise<void> {
     .returning();
 
   logger.info('Created default runtime record', { runtimeId: runtime.id });
-
-  // Store the runtime ID as the default
   await setDefaultRuntimeId(runtime.id);
 
-  // Note: Actual Lambda creation should be triggered separately via the runtimes package
-  // This service just manages the database records
+  // Eagerly create the runtime so deploys work immediately
+  try {
+    const runtimeImpl = getRuntime();
+    const result = await runtimeImpl.createRuntime({
+      runtimeId: runtime.id,
+      imageDigest: imageUri,
+    });
+
+    await db
+      .update(runtimes)
+      .set({ creationStatus: result.status })
+      .where(eq(runtimes.id, runtime.id));
+    logger.info('Default runtime created', { runtimeId: runtime.id, status: result.status });
+  } catch (error) {
+    logger.error('Failed to create default runtime', {
+      runtimeId: runtime.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    await db
+      .update(runtimes)
+      .set({
+        creationStatus: 'FAILED',
+        creationLogs: [{ timestamp: new Date().toISOString(), message: String(error), level: 'error' }],
+      })
+      .where(eq(runtimes.id, runtime.id));
+  }
 }
 
 /**
@@ -312,6 +349,35 @@ export async function getOrCreateDefaultRuntimeForVersion(sdkVersion: string): P
     .returning();
 
   logger.info('Created versioned default runtime record', { sdkVersion, runtimeId: runtime.id });
+
+  // Eagerly create the runtime so deploys work immediately
+  try {
+    const runtimeImpl = getRuntime();
+    const result = await runtimeImpl.createRuntime({
+      runtimeId: runtime.id,
+      imageDigest: imageUri,
+    });
+
+    await db
+      .update(runtimes)
+      .set({ creationStatus: result.status })
+      .where(eq(runtimes.id, runtime.id));
+    logger.info('Versioned runtime created', { sdkVersion, runtimeId: runtime.id, status: result.status });
+  } catch (error) {
+    logger.error('Failed to create versioned runtime', {
+      sdkVersion,
+      runtimeId: runtime.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    await db
+      .update(runtimes)
+      .set({
+        creationStatus: 'FAILED',
+        creationLogs: [{ timestamp: new Date().toISOString(), message: String(error), level: 'error' }],
+      })
+      .where(eq(runtimes.id, runtime.id));
+    return null;
+  }
 
   // Store version mapping in configurations table
   const [existingVersionConfig] = await db

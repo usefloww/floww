@@ -11,7 +11,7 @@ import { get, post, del, json, errorResponse, parseBody } from '~/server/api/rou
 import { getDb } from '~/server/db';
 import { secrets, namespaces, organizationMembers } from '~/server/db/schema';
 import { generateUlidUuid } from '~/server/utils/uuid';
-import { encryptSecret } from '~/server/utils/encryption';
+import { encryptSecret, decryptSecret } from '~/server/utils/encryption';
 import { createSecretSchema } from '~/server/api/schemas';
 
 // List secrets (names only)
@@ -41,6 +41,18 @@ get('/secrets', async (ctx) => {
     return errorResponse('Access denied', 403);
   }
 
+  const conditions = [eq(secrets.namespaceId, namespaceId)];
+
+  const provider = query.get('provider');
+  if (provider) {
+    conditions.push(eq(secrets.provider, provider));
+  }
+
+  const name = query.get('name');
+  if (name) {
+    conditions.push(eq(secrets.name, name));
+  }
+
   const result = await db
     .select({
       id: secrets.id,
@@ -50,7 +62,7 @@ get('/secrets', async (ctx) => {
       updatedAt: secrets.updatedAt,
     })
     .from(secrets)
-    .where(eq(secrets.namespaceId, namespaceId));
+    .where(and(...conditions));
 
   return json({
     results: result.map((s) => ({
@@ -60,6 +72,50 @@ get('/secrets', async (ctx) => {
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
     })),
+  });
+});
+
+// Get secret with decrypted value
+get('/secrets/:secretId', async (ctx) => {
+  const { user, params } = ctx;
+  if (!user) return errorResponse('Unauthorized', 401);
+
+  const db = getDb();
+
+  const [secret] = await db
+    .select()
+    .from(secrets)
+    .where(eq(secrets.id, params.secretId))
+    .limit(1);
+
+  if (!secret) {
+    return errorResponse('Secret not found', 404);
+  }
+
+  // Check access
+  const [hasAccess] = await db
+    .select({ id: namespaces.id })
+    .from(namespaces)
+    .innerJoin(
+      organizationMembers,
+      eq(namespaces.organizationOwnerId, organizationMembers.organizationId)
+    )
+    .where(
+      and(eq(namespaces.id, secret.namespaceId), eq(organizationMembers.userId, user.id))
+    )
+    .limit(1);
+
+  if (!hasAccess && !user.isAdmin) {
+    return errorResponse('Access denied', 403);
+  }
+
+  return json({
+    id: secret.id,
+    name: secret.name,
+    provider: secret.provider,
+    value: decryptSecret(secret.encryptedValue),
+    createdAt: secret.createdAt.toISOString(),
+    updatedAt: secret.updatedAt.toISOString(),
   });
 });
 

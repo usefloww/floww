@@ -299,6 +299,13 @@ if (isMainModule) {
       });
     }
 
+    // Ensure a default runtime exists so deploys work OOTB
+    import("~/server/services/default-runtime").then(({ prepareDefaultRuntime }) => {
+      prepareDefaultRuntime().catch((err: unknown) => {
+        logger.warn("Failed to prepare default runtime", { error: err instanceof Error ? err.message : String(err) });
+      });
+    });
+
   const server = createServer(async (req, res) => {
     const startTime = Date.now();
     const urlPath = req.url || "/";

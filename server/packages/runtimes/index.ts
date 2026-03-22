@@ -40,7 +40,11 @@ export function createRuntime(config: RuntimeFactoryConfig = {}): Runtime {
 
   switch (runtimeType) {
     case 'docker': {
-      const backendUrl = config.backendUrl ?? settings.general.PUBLIC_API_URL ?? settings.general.BACKEND_URL;
+      let backendUrl = config.backendUrl ?? settings.general.PUBLIC_API_URL ?? settings.general.BACKEND_URL;
+      // Containers can't reach host's localhost; use Docker Desktop's host gateway
+      if (backendUrl.includes('localhost') || backendUrl.includes('127.0.0.1')) {
+        backendUrl = backendUrl.replace(/localhost|127\.0\.0\.1/, 'host.docker.internal');
+      }
       const dockerConfig: DockerRuntimeConfig = {
         repositoryName: config.repositoryName ?? settings.runtime.REGISTRY_REPOSITORY_NAME,
         registryUrl: config.registryUrl ?? settings.runtime.REGISTRY_URL_RUNTIME ?? '',
