@@ -302,7 +302,8 @@ export async function getOrCreateDefaultRuntimeForVersion(sdkVersion: string): P
     return null;
   }
 
-  const imageUri = `${registryUrl}:default-v${sdkVersion}`;
+  const repositoryName = settings.runtime.REGISTRY_REPOSITORY_NAME;
+  const imageUri = `${registryUrl}/${repositoryName}:default-v${sdkVersion}`;
   const configHash = generateConfigHashFromUri(imageUri);
   const configKey = `default_runtime_v_${sdkVersion}`;
 
