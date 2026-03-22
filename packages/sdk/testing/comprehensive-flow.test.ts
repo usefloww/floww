@@ -319,7 +319,7 @@ describe("GitHub PR Review Bot - Builtin triggers", () => {
   it("cron: daily stale PR report", async () => {
     github.actions.listPullRequests.returns([
       { number: 1, title: "old PR", updated_at: "2025-01-01T00:00:00Z" },
-      { number: 2, title: "recent PR", updated_at: "2026-03-13T00:00:00Z" },
+      { number: 2, title: "recent PR", updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
     ]);
 
     builtin.triggers.onCron({

@@ -29,7 +29,6 @@
  * ```
  */
 
-// Core AI SDK exports
 export {
   generateText,
   streamText,
@@ -41,12 +40,15 @@ export {
   tool,
   dynamicTool,
   stepCountIs,
-  type CoreMessage,
-  type CoreSystemMessage,
-  type CoreUserMessage,
-  type CoreAssistantMessage,
-  type CoreToolMessage,
-  type TextStreamPart,
-  type ToolCallPart,
-  type ToolResultPart,
+} from "ai";
+
+export type {
+  CoreMessage,
+  CoreSystemMessage,
+  CoreUserMessage,
+  CoreAssistantMessage,
+  CoreToolMessage,
+  TextStreamPart,
+  ToolCallPart,
+  ToolResultPart,
 } from "ai";

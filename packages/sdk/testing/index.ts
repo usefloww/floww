@@ -3,6 +3,8 @@ import { wrapActionsWithSpies } from "./spies";
 import { augmentTriggersWithInvoke } from "./invoke";
 import { resetAll } from "./reset";
 
+declare const beforeEach: ((fn: () => void) => void) | undefined;
+
 enableTestMode();
 
 for (const provider of getProviderInstances()) {

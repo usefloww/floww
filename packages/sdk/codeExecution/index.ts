@@ -61,7 +61,7 @@ export async function getUserProject(
 }
 
 export async function wrapUserProject(
-  executionResult: any,
+  _executionResult: any,
   newContent: string
 ): Promise<ExecuteUserProjectOptions> {
   // Simple test wrapper API: wrapUserProject(executionResult, newContent)

@@ -19,8 +19,7 @@ export * from "./codeExecution";
 // KV Store types (KVStore provider is exported above)
 export * from "./kv";
 
-// AI utilities namespace
-export * as ai from "./ai";
+// AI utilities available via `floww/ai` sub-path export
 
 // Export execution context manager singleton for internal use
 export { executionContextManager } from "./cli/runtime/ExecutionContextManager";

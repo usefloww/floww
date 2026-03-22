@@ -304,7 +304,7 @@ export class InspectorManager {
     });
   }
 
-  async attachToVMContext(vmContext: vm.Context): Promise<void> {
+  async attachToVMContext(_vmContext: vm.Context): Promise<void> {
     // Note: Direct VM context attachment is complex in Node.js
     // This is a placeholder for potential future implementation
     console.log("ℹ️  VM Context attachment is not directly supported");

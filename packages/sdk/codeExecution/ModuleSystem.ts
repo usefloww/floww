@@ -137,23 +137,6 @@ export class ModuleSystem {
     const moduleExports = {};
     const moduleObject = { exports: moduleExports };
 
-    // Import getProvider function from common
-    let getProvider;
-    try {
-      const commonModule = require("../common");
-      getProvider = commonModule.getProvider;
-    } catch {
-      // If common module doesn't exist, create a mock function
-      getProvider = (type: string, alias?: string) => {
-        console.warn(
-          `getProvider called with ${type}${
-            alias ? ` (${alias})` : ""
-          } but provider system not available`
-        );
-        return {};
-      };
-    }
-
     const baseContext = {
       ...global,
       module: moduleObject,

@@ -6,7 +6,6 @@
  */
 
 import { post, json, errorResponse, parseBody } from '~/server/api/router';
-import { centrifugoService } from '~/server/services/centrifugo-service';
 import { centrifugoConnectSchema, centrifugoSubscribeSchema } from '~/server/api/schemas';
 import { hasWorkflowAccess, hasNamespaceAccess } from '~/server/services/access-service';
 import { getExecution } from '~/server/services/execution-service';

@@ -156,12 +156,12 @@ export class Gitlab extends BaseProvider {
           handler: args.handler,
           // Path will be auto-generated as /webhook/{uuid}
           method: "POST",
-          validation: async (event: WebhookEvent) => {
+          validation: async (_event: WebhookEvent) => {
             // TODO: Implement GitLab webhook signature validation
             return true;
           },
-          setup: async (ctx: WebhookSetupContext) => {},
-          teardown: async (ctx: WebhookTeardownContext) => {},
+          setup: async (_ctx: WebhookSetupContext) => {},
+          teardown: async (_ctx: WebhookTeardownContext) => {},
         },
         {
           type: this.providerType,
