@@ -161,19 +161,36 @@ export const syncWorkflowTriggers: Task = async (payload, _helpers) => {
   await syncTriggers(workflowId, namespaceId, triggersMetadata);
 };
 
-// Execute scheduled trigger (cron)
+// Execute scheduled trigger (cron) — fired by Graphile Worker's cron runner
 export const executeScheduledTrigger: Task = async (payload, _helpers) => {
-  const { triggerId, cronExpression, scheduledTime, executionId } = payload as {
+  const { triggerId, _cron } = payload as {
     triggerId: string;
-    cronExpression: string;
-    scheduledTime: string;
-    executionId: string;
+    _cron?: { ts: string; backfilled?: boolean };
   };
 
-  logger.info('Executing scheduled trigger', { triggerId, cronExpression, executionId });
+  const scheduledTime = _cron?.ts ? new Date(_cron.ts) : new Date();
+
+  // Look up the trigger to find the workflow and cron expression
+  const { getTrigger } = await import('../services/trigger-service');
+  const trigger = await getTrigger(triggerId);
+  if (!trigger) {
+    logger.warn('Scheduled trigger not found, skipping', { triggerId });
+    return;
+  }
+
+  const cronExpression = (trigger.input as Record<string, unknown>).expression as string ?? '';
+
+  // Create an execution record
+  const { createExecution } = await import('../services/execution-service');
+  const execution = await createExecution({
+    workflowId: trigger.workflowId,
+    triggerId,
+  });
+
+  logger.info('Executing scheduled trigger', { triggerId, cronExpression, executionId: execution.id });
 
   const { executeCronTrigger } = await import('../services/trigger-execution-service');
-  await executeCronTrigger(triggerId, cronExpression, new Date(scheduledTime), executionId);
+  await executeCronTrigger(triggerId, cronExpression, scheduledTime, execution.id);
 };
 
 /**

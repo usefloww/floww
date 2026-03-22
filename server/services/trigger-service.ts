@@ -21,6 +21,7 @@ import { encryptSecret, decryptSecret } from '~/server/utils/encryption';
 import { logger } from '~/server/utils/logger';
 import { settings } from '~/server/settings';
 import { getProviderDefinition } from 'floww/providers/server';
+import { addCronTrigger, removeCronTrigger } from '~/server/services/cron-scheduler-service';
 
 export interface TriggerInfo {
   id: string;
@@ -396,6 +397,9 @@ export async function deleteTrigger(triggerId: string): Promise<boolean> {
     }
   }
 
+  // Remove from cron scheduler before deleting
+  removeCronTrigger(triggerId);
+
   await db.delete(triggers).where(eq(triggers.id, triggerId));
 
   return true;
@@ -625,12 +629,17 @@ export async function syncTriggers(
         });
       }
 
-      // For cron triggers, create recurring task
+      // For cron triggers, create recurring task and register with the cron scheduler
       if (meta.triggerType === 'cron' || meta.triggerType === 'onCron' || meta.triggerType === 'onSchedule') {
         await db.insert(recurringTasks).values({
           id: generateUlidUuid(),
           triggerId: trigger.id,
         });
+
+        const expression = meta.input.expression as string;
+        if (expression) {
+          addCronTrigger(trigger.id, expression);
+        }
       }
 
       // Execute SDK lifecycle.create to set up external resources (webhooks, etc.)

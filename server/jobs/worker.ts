@@ -4,11 +4,13 @@
  * Initializes and runs the background job worker.
  */
 
-import { run, Runner, makeWorkerUtils, WorkerUtils } from 'graphile-worker';
+import { run, Runner, makeWorkerUtils, WorkerUtils, parseCronItems } from 'graphile-worker';
+import type { CronItem } from 'graphile-worker';
 import { taskList, cronJobs } from './index';
 import { logger } from '~/server/utils/logger';
 import { settings } from '~/server/settings';
 import { getEnvWithSecret } from '~/server/utils/docker-secrets';
+import { getCronItems, loadCronTriggersFromDb } from '~/server/services/cron-scheduler-service';
 
 let workerInstance: Runner | null = null;
 let workerUtils: WorkerUtils | null = null;
@@ -56,41 +58,37 @@ export async function startWorker(): Promise<Runner> {
   // Initialize utils first
   await initWorkerUtils();
 
-  // Start the worker
+  // Convert system cron jobs into the shared parsedCronItems array
+  const sharedCronItems = getCronItems();
+  const systemCronItems: CronItem[] = cronJobs.map((job) => ({
+    task: job.task,
+    match: job.pattern,
+    identifier: `system:${job.task}`,
+    options: {
+      backfillPeriod: 0,
+      jobKey: `system:${job.task}`,
+      jobKeyMode: 'replace' as const,
+    },
+  }));
+  const parsedSystemItems = parseCronItems(systemCronItems);
+  sharedCronItems.push(...parsedSystemItems);
+
+  // Load user-defined cron triggers from the database
+  await loadCronTriggersFromDb();
+
+  // Start the worker with the shared mutable cron items array
   workerInstance = await run({
     connectionString: getDatabaseUrl(),
     taskList,
-    // Cron tasks are scheduled separately
-    crontabFile: undefined, // We use programmatic crons
+    parsedCronItems: sharedCronItems,
     concurrency: parseInt(getEnvWithSecret('WORKER_CONCURRENCY') ?? '5', 10),
     pollInterval: 1000, // Check for jobs every second
     noHandleSignals: false, // Handle SIGINT/SIGTERM
   });
 
-  // Set up cron jobs
-  await setupCronJobs();
-
   logger.info('Graphile Worker started');
 
   return workerInstance;
-}
-
-/**
- * Set up recurring cron jobs
- */
-async function setupCronJobs(): Promise<void> {
-  const utils = getWorkerUtils();
-
-  // Note: Graphile Worker's cron functionality works via crontab
-  // For programmatic crons, we'd schedule initial jobs and let them reschedule
-  // This is a simplified approach - in production use crontab file
-
-  for (const cronJob of cronJobs) {
-    logger.debug('Setting up cron job', { task: cronJob.task, pattern: cronJob.pattern });
-
-    // Schedule first run
-    await utils.addJob(cronJob.task, {}, { jobKey: `cron:${cronJob.task}` });
-  }
 }
 
 /**
