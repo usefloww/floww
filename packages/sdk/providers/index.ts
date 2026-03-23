@@ -9,3 +9,4 @@ export * from "./kvstore";
 export * from "./secret";
 export * from "./slack";
 export * from "./todoist";
+export * from "./linear";
