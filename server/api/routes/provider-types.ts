@@ -55,6 +55,10 @@ const PROVIDER_METADATA: Record<string, { name: string; description: string }> =
     name: 'AI',
     description: 'AI language models (OpenAI, Anthropic, Google)',
   },
+  linear: {
+    name: 'Linear',
+    description: 'Linear issues, comments, and project management',
+  },
 };
 
 // List all provider types (from SDK registry + backend metadata)
