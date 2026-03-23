@@ -86,7 +86,7 @@ jobs:
           echo "Generated version: $NEW_VERSION"
 
       - name: Configure GitHub Packages auth
-        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > packages/sdk/.npmrc
+        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.NPM_AUTH_TOKEN }}" > packages/sdk/.npmrc
 
       - name: Publish to GitHub Package Registry
         working-directory: packages/sdk
