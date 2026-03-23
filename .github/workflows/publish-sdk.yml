@@ -57,7 +57,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          registry-url: 'https://npm.pkg.github.com'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -77,23 +76,21 @@ jobs:
           # Create version with commit hash: x.y.z-sha.commithash
           NEW_VERSION="${BASE_VERSION}-sha.${COMMIT_HASH}"
 
-          # Update package.json version and name for GitHub Package Registry
-          jq --arg version "$NEW_VERSION" --arg name "@usefloww/floww-sdk" '.version = $version | .name = $name' package.json > package.tmp.json
+          # Update package.json: version, name, and publishConfig registry
+          jq --arg version "$NEW_VERSION" --arg name "@usefloww/floww-sdk" \
+            '.version = $version | .name = $name | .publishConfig = {"registry": "https://npm.pkg.github.com/"}' \
+            package.json > package.tmp.json
           mv package.tmp.json package.json
 
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "Generated version: $NEW_VERSION"
 
-      - name: Set publishing config
-        run: pnpm config set '//npm.pkg.github.com/:_authToken' "${NODE_AUTH_TOKEN}"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configure GitHub Packages auth
+        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > packages/sdk/.npmrc
 
       - name: Publish to GitHub Package Registry
         working-directory: packages/sdk
         run: pnpm publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-npm:
     name: Publish to npm
