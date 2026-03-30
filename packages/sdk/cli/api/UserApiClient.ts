@@ -30,7 +30,7 @@ export class UserApiClient implements ApiClient {
     const auth = await this.getUserAuth();
     if (!auth) {
       throw new UnauthenticatedError(
-        "Authentication required. Run `floww auth login` to login."
+        "Authentication required. Run `floww login` to login."
       );
     }
 
@@ -68,7 +68,7 @@ export class UserApiClient implements ApiClient {
         }
 
         throw new UnauthenticatedError(
-          "Authentication failed. Run `floww auth login` to login."
+          "Authentication failed. Run `floww login` to login."
         );
       }
 

@@ -282,7 +282,7 @@ export class KVStore extends BaseProvider {
       if (!authToken) {
         throw new Error(
           "Auth token not available in execution context. " +
-          "In development, make sure you're authenticated with 'floww auth login'. " +
+          "In development, make sure you're authenticated with 'floww login'. " +
           "In production, the backend should include auth_token in event payloads."
         );
       }
