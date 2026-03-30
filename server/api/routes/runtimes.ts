@@ -101,6 +101,11 @@ post('/runtimes/push_token', async (ctx) => {
   const { user } = ctx;
   if (!user) return errorResponse('Unauthorized', 401);
 
+  // Only admins can get push credentials — raw registry access is a privileged operation
+  if (!user.isAdmin) {
+    return errorResponse('Admin access required', 403);
+  }
+
   if (settings.runtime.RUNTIME_TYPE !== 'lambda') {
     return errorResponse('Push tokens are only available for Lambda runtime type', 400);
   }
