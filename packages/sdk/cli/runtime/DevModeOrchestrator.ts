@@ -216,6 +216,21 @@ export class DevModeOrchestrator {
         }
       }
     });
+
+    // Show trigger summary
+    if (result.triggers.length > 0) {
+      const typeCounts: Record<string, number> = {};
+      for (const t of result.triggers) {
+        const label = t.type || "unknown";
+        typeCounts[label] = (typeCounts[label] || 0) + 1;
+      }
+      const summary = Object.entries(typeCounts)
+        .map(([type, count]) => `${count} ${type}`)
+        .join(", ");
+      logger.success(`Loaded ${result.triggers.length} trigger(s): ${summary}`);
+    } else {
+      logger.warn("No triggers found in your workflow");
+    }
   }
 
   /**
