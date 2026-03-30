@@ -223,21 +223,18 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Build and push default runtime image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: runtime-images/lambda/Dockerfile
-          target: default
-          push: true
-          provenance: false
-          build-args: |
-            SDK_VERSION=${{ steps.sdk-version.outputs.version }}
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/trigger-lambda:default-v${{ steps.sdk-version.outputs.version }}
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          SDK_VERSION: ${{ steps.sdk-version.outputs.version }}
+        run: |
+          IMAGE="${ECR_REGISTRY}/trigger-lambda:default-v${SDK_VERSION}"
+          docker build \
+            -f runtime-images/lambda/Dockerfile \
+            --target default \
+            --build-arg SDK_VERSION="${SDK_VERSION}" \
+            -t "${IMAGE}" .
+          docker push "${IMAGE}"
 
   deploy-production:
     name: Deploy to Production
