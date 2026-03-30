@@ -5,6 +5,7 @@
  * routing to the appropriate backend registry (Docker Hub, ECR, GCR, etc).
  */
 
+import { ECRClient, GetAuthorizationTokenCommand } from '@aws-sdk/client-ecr';
 import { settings } from '~/server/settings';
 
 export interface RegistryCredentials {
@@ -90,11 +91,30 @@ export class RegistryProxy {
   }
 
   private async authenticateECR(): Promise<string> {
-    // In production, use @aws-sdk/client-ecr
-    // const ecr = new ECRClient({ region: 'us-east-1' });
-    // const response = await ecr.send(new GetAuthorizationTokenCommand({}));
-    // return response.authorizationData[0].authorizationToken;
-    throw new Error('ECR authentication not implemented');
+    const clientConfig: { region: string; credentials?: { accessKeyId: string; secretAccessKey: string } } = {
+      region: settings.runtime.AWS_REGION,
+    };
+
+    if (settings.runtime.AWS_ACCESS_KEY_ID && settings.runtime.AWS_SECRET_ACCESS_KEY) {
+      clientConfig.credentials = {
+        accessKeyId: settings.runtime.AWS_ACCESS_KEY_ID,
+        secretAccessKey: settings.runtime.AWS_SECRET_ACCESS_KEY,
+      };
+    }
+
+    const ecr = new ECRClient(clientConfig);
+    const response = await ecr.send(new GetAuthorizationTokenCommand({}));
+
+    const authData = response.authorizationData?.[0];
+    if (!authData?.authorizationToken) {
+      throw new Error('Failed to get ECR authorization token');
+    }
+
+    this.token = authData.authorizationToken;
+    if (authData.expiresAt) {
+      this.tokenExpiry = authData.expiresAt;
+    }
+    return this.token;
   }
 
   private async authenticateGCR(): Promise<string> {
@@ -195,6 +215,49 @@ export class RegistryProxy {
       size: parseInt(response.headers.get('Content-Length') ?? '0', 10),
     };
   }
+}
+
+/**
+ * Get ECR push credentials for custom Docker image uploads.
+ * Returns username/password decoded from the ECR authorization token.
+ */
+export async function getECRPushCredentials(): Promise<{
+  username: string;
+  password: string;
+  registry: string;
+  expiresAt?: Date;
+}> {
+  const clientConfig: { region: string; credentials?: { accessKeyId: string; secretAccessKey: string } } = {
+    region: settings.runtime.AWS_REGION,
+  };
+
+  if (settings.runtime.AWS_ACCESS_KEY_ID && settings.runtime.AWS_SECRET_ACCESS_KEY) {
+    clientConfig.credentials = {
+      accessKeyId: settings.runtime.AWS_ACCESS_KEY_ID,
+      secretAccessKey: settings.runtime.AWS_SECRET_ACCESS_KEY,
+    };
+  }
+
+  const ecr = new ECRClient(clientConfig);
+  const response = await ecr.send(new GetAuthorizationTokenCommand({}));
+
+  const authData = response.authorizationData?.[0];
+  if (!authData?.authorizationToken || !authData?.proxyEndpoint) {
+    throw new Error('Failed to get ECR authorization token');
+  }
+
+  // ECR token is base64-encoded "username:password"
+  const decoded = Buffer.from(authData.authorizationToken, 'base64').toString('utf-8');
+  const [username, password] = decoded.split(':');
+
+  const registry = authData.proxyEndpoint.replace(/^https?:\/\//, '');
+
+  return {
+    username,
+    password,
+    registry,
+    expiresAt: authData.expiresAt,
+  };
 }
 
 /**

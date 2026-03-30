@@ -4,12 +4,16 @@
  * GET /api/runtimes - List runtimes
  * GET /api/runtimes/:id - Get runtime
  * POST /api/runtimes - Create runtime
+ * POST /api/runtimes/push_token - Get ECR push credentials
  */
 
 import { get, post, json, errorResponse, parseBody } from '~/server/api/router';
 import * as runtimeService from '~/server/services/runtime-service';
 import { getDefaultRuntimeId } from '~/server/services/default-runtime';
 import { createRuntimeSchema } from '~/server/api/schemas';
+import { getECRPushCredentials } from '~/server/packages/registry-proxy';
+import { settings } from '~/server/settings';
+import { logger } from '~/server/utils/logger';
 
 // List runtimes
 get('/runtimes', async (ctx) => {
@@ -90,4 +94,32 @@ post('/runtimes', async (ctx) => {
     creationStatus: runtime.creationStatus,
     createdAt: runtime.createdAt.toISOString(),
   }, 201);
+});
+
+// Get push credentials for custom Docker image uploads
+post('/runtimes/push_token', async (ctx) => {
+  const { user } = ctx;
+  if (!user) return errorResponse('Unauthorized', 401);
+
+  if (settings.runtime.RUNTIME_TYPE !== 'lambda') {
+    return errorResponse('Push tokens are only available for Lambda runtime type', 400);
+  }
+
+  try {
+    const credentials = await getECRPushCredentials();
+    const repositoryName = settings.runtime.REGISTRY_REPOSITORY_NAME;
+
+    return json({
+      username: credentials.username,
+      password: credentials.password,
+      registry: credentials.registry,
+      repository: repositoryName,
+      expiresAt: credentials.expiresAt?.toISOString(),
+    });
+  } catch (error) {
+    logger.error('Failed to get ECR push credentials', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return errorResponse('Failed to generate push credentials', 500);
+  }
 });
