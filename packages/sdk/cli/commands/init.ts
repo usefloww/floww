@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import {
   initProjectConfig,
   hasProjectConfig,
@@ -12,6 +13,22 @@ import { logger } from "../utils/logger";
 import { setupWorkflow } from "../utils/promptUtils";
 import { getValidAuth } from "../auth/tokenUtils";
 import { getErrorMessage } from "../api/errors";
+
+function getSdkVersion(): string {
+  try {
+    const thisFile = fileURLToPath(import.meta.url);
+    let dir = path.dirname(thisFile);
+    for (let i = 0; i < 5; i++) {
+      const pkgPath = path.join(dir, "package.json");
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+        if (pkg.name === "floww") return pkg.version;
+      }
+      dir = path.dirname(dir);
+    }
+  } catch {}
+  return "latest";
+}
 
 interface InitOptions {
   force?: boolean;
@@ -54,14 +71,14 @@ export async function initCommand(
     if (!options.silent) {
       initMode = await logger.select("How would you like to initialize?", [
         {
-          value: "new" as const,
-          label: "Create new scaffolded project",
-          hint: "Generate complete project structure",
-        },
-        {
           value: "current" as const,
           label: "Initialize in current directory",
           hint: "Add floww.yaml to existing project",
+        },
+        {
+          value: "new" as const,
+          label: "Create new scaffolded project",
+          hint: "Generate complete project structure",
         },
       ]);
 
@@ -437,7 +454,7 @@ function createPackageJson(filePath: string, projectName: string) {
       deploy: "floww deploy",
     },
     dependencies: {
-      floww: "*",
+      floww: `^${getSdkVersion()}`,
     },
     devDependencies: {
       "@types/node": "^22.0.0",

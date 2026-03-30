@@ -274,8 +274,12 @@ export class FlowwLogger {
   ): Promise<string> {
     if (!isInteractive) {
       // In non-interactive mode, return default value or placeholder
-      const value = defaultValue || placeholder || "default";
-      this.info(`${message} (auto-filled: ${value})`);
+      const value = defaultValue || placeholder || "";
+      if (value) {
+        this.info(`${message} (auto-filled: ${value})`);
+      } else {
+        this.info(`${message} (skipped, no default)`);
+      }
       return value;
     }
 

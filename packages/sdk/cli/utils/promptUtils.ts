@@ -68,16 +68,11 @@ export async function setupWorkflow(
       }
     }
 
-    let description: string | undefined;
-    description = await logger.text("Description (optional):", "", "");
-    if (!description) description = undefined;
-
     try {
       selectedWorkflow = await logger.task("Creating new workflow", async () => {
         return await apiCreateWorkflow(
           workflowName,
           selectedNamespaceId,
-          description,
         );
       });
       workflowId = selectedWorkflow.id;
