@@ -66,7 +66,7 @@ async function refreshTokenWithProfile(
   }
 
   try {
-    const cliAuth = new CLIAuth(profile.config);
+    const cliAuth = new CLIAuth(profile.config, profile.backendUrl);
     const refreshedAuth = await cliAuth.refreshAccessToken(
       profile.auth.refreshToken
     );
@@ -101,7 +101,7 @@ async function refreshTokenLegacy(
         issuer: `${apiUrl}/user_management`,
       },
       websocket_url: getWebSocketUrl(),
-    });
+    }, config.backendUrl);
     const refreshedAuth = await cliAuth.refreshAccessToken(auth.refreshToken);
 
     saveTokens(refreshedAuth);

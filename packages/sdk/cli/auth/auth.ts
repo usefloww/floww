@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 import { DeviceAuthResponse, StoredAuth, TokenResponse } from "./authTypes";
 import { BackendConfig } from "../config/backendConfig";
 import { logger } from "../utils/logger";
-import { getConfigValue } from "../config/configUtils";
 
 function extractExpirationFromJWT(accessToken: string): number {
   try {
@@ -24,9 +23,11 @@ function extractExpirationFromJWT(accessToken: string): number {
 
 export class CLIAuth {
   private config: BackendConfig;
+  private backendUrl: string;
 
-  constructor(config: BackendConfig) {
+  constructor(config: BackendConfig, backendUrl?: string) {
     this.config = config;
+    this.backendUrl = backendUrl ?? "";
   }
 
   async login(): Promise<StoredAuth> {
@@ -222,8 +223,10 @@ export class CLIAuth {
   }
 
   private async fetchUserInfo(accessToken: string): Promise<any> {
-    const backendUrl = getConfigValue("backendUrl");
-    const whoamiUrl = `${backendUrl}/api/whoami`;
+    if (!this.backendUrl) {
+      throw new Error("Backend URL not configured for user info fetch");
+    }
+    const whoamiUrl = `${this.backendUrl}/api/whoami`;
 
     // Use native fetch (Node 18+)
     const response = await fetch(whoamiUrl, {

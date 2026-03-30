@@ -24,7 +24,7 @@ async function loginCommand() {
     const config = await fetchBackendConfig(backendUrl);
     logger.success(`Connected to backend (provider: ${config.auth.provider})`);
 
-    const auth = new CLIAuth(config);
+    const auth = new CLIAuth(config, backendUrl);
     const tokens = await auth.login();
 
     saveProfile(backendUrl, config, tokens);
