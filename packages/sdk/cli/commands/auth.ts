@@ -59,7 +59,8 @@ async function logoutCommand() {
 
 async function whoamiCommand() {
   const client = defaultApiClient();
-  const user = await client.apiCall<any>("/whoami");
+  const whoamiResponse = await client.apiCall<any>("/whoami");
+  const user = whoamiResponse.user;
 
   const profile = loadActiveProfile();
 
